@@ -218,8 +218,8 @@ if yr_range:
     mask &= df["read_year"].between(*yr_range)
 if pub_range:
     mask &= df["pub_year"].fillna(9999).between(*pub_range)
-if genres_sel:
-    mask &= df["genre_list"].apply(lambda lst: any(g in genres_sel for g in lst) or lst == [])
+if genres_sel and len(genres_sel) < len(all_genres):
+    mask &= df["genre_list"].apply(lambda lst: any(g in genres_sel for g in lst))
 if ratings_sel is not None:
     mask &= df["my_rating"].isin(ratings_sel)
 
@@ -301,11 +301,18 @@ with tab1:
 
     scatter_df["hover"] = scatter_df.apply(hover_text, axis=1)
 
+    # Construir un trace por cada género considerando TODOS los géneros del libro,
+    # no solo el primero. Un libro con [sci-fi, favorites] aparece en ambos traces.
     fig = go.Figure()
 
-    # Un trace por género para leyenda coloreada
-    for genre in sorted(scatter_df["primary_genre"].unique()):
-        gdf = scatter_df[scatter_df["primary_genre"] == genre]
+    all_scatter_genres = sorted(set(g for lst in scatter_df["genre_list"] for g in lst if g))
+    if not all_scatter_genres:
+        all_scatter_genres = ["sin categoría"]
+
+    for genre in all_scatter_genres:
+        gdf = scatter_df[scatter_df["genre_list"].apply(lambda lst: genre in lst)]
+        if gdf.empty:
+            continue
         fig.add_trace(go.Scatter(
             x=gdf["read_float"],
             y=gdf["pub_year"],
@@ -339,7 +346,7 @@ with tab1:
             range=[y_min, y_max],
         ),
         legend=dict(
-            title="Género principal",
+            title="Géneros",
             orientation="v",
             bgcolor="rgba(255,255,255,0.9)",
             bordercolor="#ddd",
@@ -366,47 +373,62 @@ with tab1:
 # ─────────────────────────────────────────────────────────────────────────────
 with tab2:
     st.caption("💡 Hacé clic en una barra para ver los libros de ese autor.")
-    col_a, col_b = st.columns([1.2, 1])
+    top_n = st.slider("Mostrar top N", 5, 30, 15, key="top_n")
+
+    col_a, col_b, col_c2 = st.columns(3)
+
+    # ── Preparar los tres datasets ───────────────────────────────────────────
+    auth_cnt = (
+        dff["author"].value_counts().head(top_n)
+        .reset_index().rename(columns={"count":"Libros","author":"Autor"})
+    )
+
+    auth_pag = (
+        dff[dff["pages"].notna()]
+        .groupby("author")["pages"].sum()
+        .sort_values(ascending=False).head(top_n)
+        .reset_index().rename(columns={"author":"Autor","pages":"Páginas"})
+    )
+    auth_pag["Páginas"] = auth_pag["Páginas"].astype(int)
+
+    auth_rat = (
+        dff[dff["my_rating"] > 0]
+        .groupby("author")
+        .agg(Libros=("title","count"), Rating=("my_rating","mean"))
+        .query("Libros >= 2")
+        .sort_values("Rating", ascending=False)
+        .head(top_n).reset_index()
+        .rename(columns={"author":"Autor"})
+    )
+    auth_rat["Rating"] = auth_rat["Rating"].round(2)
+
+    chart_h = max(380, top_n * 28)
 
     with col_a:
-        st.markdown('<div class="section-title">Top autores por libros leídos</div>', unsafe_allow_html=True)
-        top_n = st.slider("Mostrar top N", 5, 30, 15, key="top_n")
-        auth_cnt = (
-            dff["author"].value_counts().head(top_n)
-            .reset_index().rename(columns={"count":"Libros","author":"Autor"})
-        )
-        fig_a = px.bar(
-            auth_cnt, x="Libros", y="Autor", orientation="h",
-            color="Libros", color_continuous_scale=[BLUE, RED],
-        )
-        fig_a.update_layout(
-            **LAYOUT_BASE, height=max(380, top_n*28),
-            yaxis=dict(autorange="reversed"), coloraxis_showscale=False,
-        )
+        st.markdown('<div class="section-title">Por libros leídos</div>', unsafe_allow_html=True)
+        fig_a = px.bar(auth_cnt, x="Libros", y="Autor", orientation="h",
+                       color="Libros", color_continuous_scale=[BLUE, RED])
+        fig_a.update_layout(**LAYOUT_BASE, height=chart_h,
+                            yaxis=dict(autorange="reversed"), coloraxis_showscale=False)
         sel_a = st.plotly_chart(fig_a, use_container_width=True,
                                 on_select="rerun", key="chart_authors_count")
 
     with col_b:
-        st.markdown('<div class="section-title">Rating promedio por autor (≥2 libros)</div>', unsafe_allow_html=True)
-        auth_rat = (
-            dff[dff["my_rating"] > 0]
-            .groupby("author")
-            .agg(Libros=("title","count"), Rating=("my_rating","mean"))
-            .query("Libros >= 2")
-            .sort_values("Rating", ascending=False)
-            .head(top_n).reset_index()
-            .rename(columns={"author":"Autor"})
-        )
-        auth_rat["Rating"] = auth_rat["Rating"].round(2)
-        fig_b = px.bar(
-            auth_rat, x="Rating", y="Autor", orientation="h",
-            color="Rating", color_continuous_scale=[ORANGE, RED],
-            range_x=[0, 5.3], hover_data={"Libros": True},
-        )
-        fig_b.update_layout(
-            **LAYOUT_BASE, height=max(380, top_n*28),
-            yaxis=dict(autorange="reversed"), coloraxis_showscale=False,
-        )
+        st.markdown('<div class="section-title">Por páginas leídas</div>', unsafe_allow_html=True)
+        fig_b2 = px.bar(auth_pag, x="Páginas", y="Autor", orientation="h",
+                        color="Páginas", color_continuous_scale=[BLUE, GREEN])
+        fig_b2.update_layout(**LAYOUT_BASE, height=chart_h,
+                             yaxis=dict(autorange="reversed"), coloraxis_showscale=False)
+        sel_b2 = st.plotly_chart(fig_b2, use_container_width=True,
+                                 on_select="rerun", key="chart_authors_pages")
+
+    with col_c2:
+        st.markdown('<div class="section-title">Por rating promedio (≥2 libros)</div>', unsafe_allow_html=True)
+        fig_b = px.bar(auth_rat, x="Rating", y="Autor", orientation="h",
+                       color="Rating", color_continuous_scale=["#e94560", "#f5a623", "#53c28b"],
+                       range_x=[0, 5.3], hover_data={"Libros": True})
+        fig_b.update_layout(**LAYOUT_BASE, height=chart_h,
+                            yaxis=dict(autorange="reversed"), coloraxis_showscale=False)
         sel_b = st.plotly_chart(fig_b, use_container_width=True,
                                 on_select="rerun", key="chart_authors_rating")
 
@@ -414,8 +436,9 @@ with tab2:
     selected_author = None
 
     for sel, df_ref, col_name in [
-        (sel_a, auth_cnt, "Autor"),
-        (sel_b, auth_rat, "Autor"),
+        (sel_a,  auth_cnt, "Autor"),
+        (sel_b2, auth_pag, "Autor"),
+        (sel_b,  auth_rat, "Autor"),
     ]:
         try:
             pts = sel.selection.get("points", [])
