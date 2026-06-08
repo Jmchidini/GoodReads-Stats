@@ -577,6 +577,83 @@ with tab3:
         fig_pg.update_layout(**LAYOUT_BASE, height=280)
         st.plotly_chart(fig_pg, use_container_width=True)
 
+    # ── Desglose mensual ─────────────────────────────────────────────────────
+    st.divider()
+    st.markdown('<div class="section-title">Desglose mensual</div>', unsafe_allow_html=True)
+    st.caption("💡 Hacé clic en una barra para ver los libros de ese mes.")
+
+    if dff["date_read"].notna().any():
+        # Preparar columna Año-Mes para eje X
+        monthly = dff.dropna(subset=["date_read"]).copy()
+        monthly["anio_mes"] = monthly["date_read"].dt.to_period("M").astype(str)
+        monthly["anio_mes_dt"] = pd.to_datetime(monthly["anio_mes"])
+
+        col_m1, col_m2 = st.columns(2)
+
+        with col_m1:
+            st.markdown("**Libros por mes**")
+            libros_mes = (
+                monthly.groupby("anio_mes_dt").size()
+                .reset_index(name="Libros")
+                .sort_values("anio_mes_dt")
+            )
+            fig_lm = px.bar(libros_mes, x="anio_mes_dt", y="Libros",
+                            color="Libros", color_continuous_scale=[BLUE, RED],
+                            labels={"anio_mes_dt": "Mes"})
+            fig_lm.update_layout(**LAYOUT_BASE, height=320,
+                                 coloraxis_showscale=False,
+                                 xaxis=dict(tickformat="%b %Y", tickangle=-45))
+            sel_lm = st.plotly_chart(fig_lm, use_container_width=True,
+                                     on_select="rerun", key="chart_libros_mes")
+
+        with col_m2:
+            if "pages" in monthly.columns:
+                st.markdown("**Páginas por mes**")
+                pags_mes = (
+                    monthly.groupby("anio_mes_dt")["pages"].sum()
+                    .reset_index(name="Páginas")
+                    .sort_values("anio_mes_dt")
+                )
+                fig_pm = px.bar(pags_mes, x="anio_mes_dt", y="Páginas",
+                                color="Páginas", color_continuous_scale=[BLUE, GREEN],
+                                labels={"anio_mes_dt": "Mes"})
+                fig_pm.update_layout(**LAYOUT_BASE, height=320,
+                                     coloraxis_showscale=False,
+                                     xaxis=dict(tickformat="%b %Y", tickangle=-45))
+                sel_pm = st.plotly_chart(fig_pm, use_container_width=True,
+                                         on_select="rerun", key="chart_pags_mes")
+            else:
+                sel_pm = None
+
+        # Tabla al hacer clic en los gráficos mensuales
+        filtered_monthly = None
+        label_monthly = None
+
+        for sel_m, df_ref_m in [(sel_lm, libros_mes), (sel_pm, pags_mes) if "pages" in monthly.columns else (None, None)]:
+            if sel_m is None:
+                continue
+            try:
+                pts = sel_m.selection.get("points", [])
+                if pts:
+                    idx = pts[0].get("point_index", None)
+                    if idx is not None:
+                        mes_dt = df_ref_m.iloc[idx]["anio_mes_dt"]
+                        label_monthly = f"📅 Libros leídos en {mes_dt.strftime('%B %Y')}"
+                        filtered_monthly = monthly[monthly["anio_mes_dt"] == mes_dt]
+                        break
+            except Exception:
+                pass
+
+        if filtered_monthly is not None and label_monthly:
+            st.markdown(f'<div class="section-title">{label_monthly}</div>', unsafe_allow_html=True)
+            cols_show = [c for c in ["title","author","date_read","my_rating","pages","primary_genre"] if c in filtered_monthly.columns]
+            fm = filtered_monthly[cols_show].rename(columns={
+                "title":"Título","author":"Autor","date_read":"Leído",
+                "my_rating":"Rating","pages":"Páginas","primary_genre":"Género"
+            }).sort_values("Leído", ascending=False)
+            fm["Leído"] = fm["Leído"].dt.strftime("%d %b %Y")
+            st.dataframe(fm, use_container_width=True, hide_index=True)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # TAB 4: GÉNEROS & RANKINGS
