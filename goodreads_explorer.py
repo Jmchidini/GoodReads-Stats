@@ -99,6 +99,7 @@ def load_data(file):
         "Date Added": "date_added", "Bookshelves": "shelves",
         "Exclusive Shelf": "shelf", "Publisher": "publisher",
         "Average Rating": "avg_rating", "My Review": "review",
+        "ISBN": "isbn", "ISBN13": "isbn13",
     }
     df = df.rename(columns={k: v for k, v in col_map.items() if k in df.columns})
 
@@ -144,6 +145,37 @@ def metric_card(col, value, label):
       <div class="label">{label}</div>
     </div>
     """, unsafe_allow_html=True)
+
+def goodreads_url(row):
+    """Genera URL de búsqueda en Goodreads usando ISBN13, ISBN o título."""
+    for col in ["isbn13", "isbn"]:
+        val = str(row.get(col, "")).strip().strip("=").strip('"')
+        if val and val not in ["nan", "", "0"]:
+            return f"https://www.goodreads.com/search?q={val}"
+    # Fallback por título + autor
+    title  = str(row.get("title", "")).replace(" ", "+")
+    author = str(row.get("author", "")).replace(" ", "+")
+    return f"https://www.goodreads.com/search?q={title}+{author}"
+
+def add_goodreads_links(df_display):
+    """Agrega columna de links HTML a un dataframe para mostrar en st.markdown."""
+    return df_display
+
+def show_books_table(df_src, sort_col="date_read", height=320):
+    """Muestra tabla de libros con link a Goodreads. df_src debe ser el df original (con ISBNs)."""
+    cols_show = [c for c in ["title","author","pub_year","date_read","my_rating","pages"] if c in df_src.columns]
+    t = df_src[cols_show].copy()
+    t["🔗"] = df_src.apply(lambda r: f'<a href="{goodreads_url(r)}" target="_blank">Goodreads</a>', axis=1)
+    t = t.rename(columns={
+        "title":"Título","author":"Autor","pub_year":"Publicado",
+        "date_read":"Leído","my_rating":"Rating","pages":"Páginas",
+    })
+    if "Leído" in t.columns:
+        t = t.sort_values("Leído", ascending=False)
+        t["Leído"] = t["Leído"].dt.strftime("%b %Y")
+    if "Publicado" in t.columns:
+        t["Publicado"] = t["Publicado"].fillna(0).astype(int)
+    st.write(t.to_html(escape=False, index=False), unsafe_allow_html=True)
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -288,6 +320,7 @@ with tab1:
         rating_str = "⭐" * int(row.get("my_rating", 0)) if row.get("my_rating", 0) > 0 else "sin rating"
         pages_str  = f"{int(row['pages'])} págs" if pd.notna(row.get("pages")) else ""
         genre_str  = ", ".join(row.get("genre_list", []))
+        url        = goodreads_url(row)
         parts = [
             f"<b>{row['title']}</b>",
             f"{row['author']}",
@@ -297,6 +330,7 @@ with tab1:
         ]
         if pages_str:  parts.append(pages_str)
         if genre_str:  parts.append(genre_str)
+        parts.append(f"<a href='{url}' target='_blank'>🔗 Ver en Goodreads</a>")
         return "<br>".join(parts)
 
     scatter_df["hover"] = scatter_df.apply(hover_text, axis=1)
@@ -360,12 +394,18 @@ with tab1:
 
     with st.expander("Ver tabla completa de libros"):
         cols_show = [c for c in ["title","author","pub_year","date_read","my_rating","pages","primary_genre"] if c in dff.columns]
-        show_df = dff[cols_show].rename(columns={
+        show_df = dff[cols_show].copy()
+        show_df["goodreads"] = dff.apply(lambda r: f'<a href="{goodreads_url(r)}" target="_blank">🔗</a>', axis=1)
+        show_df = show_df.rename(columns={
             "title":"Título","author":"Autor","pub_year":"Publicado",
             "date_read":"Leído","my_rating":"Rating","pages":"Páginas",
-            "primary_genre":"Género"
+            "primary_genre":"Género","goodreads":"Goodreads"
         }).sort_values("Leído", ascending=False)
-        st.dataframe(show_df, use_container_width=True, height=320)
+        if "Leído" in show_df.columns:
+            show_df["Leído"] = show_df["Leído"].dt.strftime("%b %Y")
+        if "Publicado" in show_df.columns:
+            show_df["Publicado"] = show_df["Publicado"].fillna(0).astype(int)
+        st.write(show_df.to_html(escape=False, index=False), unsafe_allow_html=True)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -453,16 +493,7 @@ with tab2:
     if selected_author:
         st.markdown(f'<div class="section-title">📚 Libros de {selected_author}</div>', unsafe_allow_html=True)
         author_books = dff[dff["author"] == selected_author].copy()
-        cols_show = [c for c in ["title","pub_year","date_read","my_rating","pages","primary_genre"] if c in author_books.columns]
-        author_books = author_books[cols_show].rename(columns={
-            "title":"Título","pub_year":"Publicado","date_read":"Leído",
-            "my_rating":"Rating","pages":"Páginas","primary_genre":"Género"
-        }).sort_values("Leído", ascending=False)
-        if "Leído" in author_books.columns:
-            author_books["Leído"] = author_books["Leído"].dt.strftime("%b %Y")
-        if "Publicado" in author_books.columns:
-            author_books["Publicado"] = author_books["Publicado"].fillna(0).astype(int)
-        st.dataframe(author_books, use_container_width=True, hide_index=True)
+        show_books_table(author_books)
     else:
         # Tabla resumen completa por defecto
         st.markdown('<div class="section-title">Detalle completo por autor</div>', unsafe_allow_html=True)
@@ -542,14 +573,7 @@ with tab3:
 
     if filtered_books is not None and selected_label:
         st.markdown(f'<div class="section-title">{selected_label}</div>', unsafe_allow_html=True)
-        cols_show = [c for c in ["title","author","date_read","my_rating","pages","primary_genre"] if c in filtered_books.columns]
-        fb = filtered_books[cols_show].rename(columns={
-            "title":"Título","author":"Autor","date_read":"Leído",
-            "my_rating":"Rating","pages":"Páginas","primary_genre":"Género"
-        }).sort_values("Leído", ascending=False)
-        if "Leído" in fb.columns:
-            fb["Leído"] = fb["Leído"].dt.strftime("%b %Y")
-        st.dataframe(fb, use_container_width=True, hide_index=True)
+        show_books_table(filtered_books)
 
     # Curva acumulada
     st.markdown('<div class="section-title">Libros acumulados a lo largo del tiempo</div>', unsafe_allow_html=True)
@@ -646,13 +670,7 @@ with tab3:
 
         if filtered_monthly is not None and label_monthly:
             st.markdown(f'<div class="section-title">{label_monthly}</div>', unsafe_allow_html=True)
-            cols_show = [c for c in ["title","author","date_read","my_rating","pages","primary_genre"] if c in filtered_monthly.columns]
-            fm = filtered_monthly[cols_show].rename(columns={
-                "title":"Título","author":"Autor","date_read":"Leído",
-                "my_rating":"Rating","pages":"Páginas","primary_genre":"Género"
-            }).sort_values("Leído", ascending=False)
-            fm["Leído"] = fm["Leído"].dt.strftime("%d %b %Y")
-            st.dataframe(fm, use_container_width=True, hide_index=True)
+            show_books_table(filtered_monthly)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -748,16 +766,7 @@ with tab4:
 
     if filtered_books is not None and selected_label:
         st.markdown(f'<div class="section-title">{selected_label}</div>', unsafe_allow_html=True)
-        cols_show = [c for c in ["title","author","pub_year","date_read","my_rating","pages"] if c in filtered_books.columns]
-        fb = filtered_books[cols_show].rename(columns={
-            "title":"Título","author":"Autor","pub_year":"Publicado",
-            "date_read":"Leído","my_rating":"Rating","pages":"Páginas"
-        }).sort_values("Leído", ascending=False)
-        if "Leído" in fb.columns:
-            fb["Leído"] = fb["Leído"].dt.strftime("%b %Y")
-        if "Publicado" in fb.columns:
-            fb["Publicado"] = fb["Publicado"].fillna(0).astype(int)
-        st.dataframe(fb, use_container_width=True, hide_index=True)
+        show_books_table(filtered_books)
 
     # Rankings especiales (siempre visibles)
     st.markdown('<div class="section-title">🏆 Rankings especiales</div>', unsafe_allow_html=True)
@@ -766,28 +775,12 @@ with tab4:
     with r1:
         st.markdown("**📖 Libros más largos**")
         if "pages" in dff.columns:
-            longest = (
-                dff.nlargest(8, "pages")[["title","author","pages"]]
-                .dropna(subset=["pages"])
-                .rename(columns={"title":"Título","author":"Autor","pages":"Págs"})
-            )
-            longest["Págs"] = longest["Págs"].astype(int)
-            st.dataframe(longest, use_container_width=True, hide_index=True)
+            show_books_table(dff.dropna(subset=["pages"]).nlargest(8, "pages"))
 
     with r2:
         st.markdown("**⭐ Tus 5 estrellas**")
-        five_star = dff[dff["my_rating"] == 5][["title","author","read_year"]].rename(
-            columns={"title":"Título","author":"Autor","read_year":"Año"}
-        ).sort_values("Año", ascending=False)
-        five_star["Año"] = five_star["Año"].fillna(0).astype(int)
-        st.dataframe(five_star, use_container_width=True, hide_index=True)
+        show_books_table(dff[dff["my_rating"] == 5])
 
     with r3:
         st.markdown("**📅 Últimos leídos**")
-        recent = (
-            dff.dropna(subset=["date_read"])
-            .nlargest(10, "date_read")[["title","author","date_read","my_rating"]]
-            .rename(columns={"title":"Título","author":"Autor","date_read":"Fecha","my_rating":"Rating"})
-        )
-        recent["Fecha"] = recent["Fecha"].dt.strftime("%b %Y")
-        st.dataframe(recent, use_container_width=True, hide_index=True)
+        show_books_table(dff.dropna(subset=["date_read"]).nlargest(10, "date_read"))
