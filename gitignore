@@ -1,0 +1,20 @@
+# Datos personales — nunca subir
+*.csv
+
+# Script local de Windows — rutas personales
+actualizar_github.bat
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+
+# IDEs
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
