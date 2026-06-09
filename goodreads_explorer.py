@@ -390,7 +390,69 @@ with tab1:
         title="Año de publicación vs. año de lectura",
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+    sel_scatter = st.plotly_chart(fig, use_container_width=True,
+                                  on_select="rerun", key="chart_scatter")
+
+    # ── Ficha fija al hacer clic en un punto ────────────────────────────────
+    try:
+        pts = sel_scatter.selection.get("points", [])
+        if pts:
+            pt = pts[0]
+            # Buscar el libro por coordenadas
+            read_val = pt.get("x")
+            pub_val  = pt.get("y")
+            match = scatter_df[
+                (scatter_df["read_float"].round(3) == round(read_val, 3)) &
+                (scatter_df["pub_year"] == pub_val)
+            ]
+            if match.empty:
+                # Fallback: el punto más cercano
+                scatter_df["_dist"] = (
+                    (scatter_df["read_float"] - read_val).abs() +
+                    (scatter_df["pub_year"]   - pub_val).abs()
+                )
+                match = scatter_df.nsmallest(1, "_dist")
+
+            if not match.empty:
+                row = match.iloc[0]
+                rating_str = "⭐" * int(row.get("my_rating", 0)) if row.get("my_rating", 0) > 0 else "Sin rating"
+                pages_str  = f"{int(row['pages'])} páginas" if pd.notna(row.get("pages")) else "—"
+                genres_str = ", ".join(row.get("genre_list", [])) or "—"
+                url        = goodreads_url(row)
+
+                st.markdown(f"""
+                <div style="
+                    background: linear-gradient(135deg, #1a1a2e, #16213e);
+                    border: 1px solid #0f3460;
+                    border-radius: 12px;
+                    padding: 1.2rem 1.5rem;
+                    color: #e0e0e0;
+                    max-width: 600px;
+                    margin: 0.5rem 0 1rem;
+                ">
+                    <div style="font-size:1.2rem; font-weight:700; color:#e94560; margin-bottom:0.4rem;">
+                        {row['title']}
+                    </div>
+                    <div style="font-size:0.95rem; color:#b0b8c8; margin-bottom:0.8rem;">
+                        {row['author']}
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem 2rem; font-size:0.88rem;">
+                        <span>📅 Publicado: <b>{int(row['pub_year'])}</b></span>
+                        <span>📖 Leído: <b>{row['date_read'].strftime('%b %Y')}</b></span>
+                        <span>⭐ Rating: <b>{rating_str}</b></span>
+                        <span>📄 Páginas: <b>{pages_str}</b></span>
+                        <span style="grid-column:1/-1">🏷️ Géneros: <b>{genres_str}</b></span>
+                    </div>
+                    <div style="margin-top:0.9rem;">
+                        <a href="{url}" target="_blank" style="
+                            background:#e94560; color:white; padding:0.4rem 1rem;
+                            border-radius:6px; text-decoration:none; font-size:0.85rem;
+                        ">🔗 Ver en Goodreads</a>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+    except Exception:
+        pass
 
     with st.expander("Ver tabla completa de libros"):
         cols_show = [c for c in ["title","author","pub_year","date_read","my_rating","pages","primary_genre"] if c in dff.columns]
