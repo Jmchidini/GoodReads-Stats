@@ -14,6 +14,21 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
+import json
+import os
+
+# ── Sistema de traducciones ───────────────────────────────────────────────────
+LANGUAGES = {"Español": "es", "English": "en"}
+
+@st.cache_data
+def load_locale(lang_code: str) -> dict:
+    path = os.path.join(os.path.dirname(__file__), "locales", f"{lang_code}.json")
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+def t(key: str) -> str:
+    """Retorna el string traducido para la clave dada."""
+    return st.session_state.get("locale", {}).get(key, key)
 
 # ── Configuración ─────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -162,64 +177,77 @@ def add_goodreads_links(df_display):
     return df_display
 
 def show_books_table(df_src, sort_col="date_read", height=320):
-    """Muestra tabla de libros con link a Goodreads. df_src debe ser el df original (con ISBNs)."""
+    """Muestra tabla de libros con link a Goodreads."""
     cols_show = [c for c in ["title","author","pub_year","date_read","my_rating","pages"] if c in df_src.columns]
-    t = df_src[cols_show].copy()
-    t["🔗"] = df_src.apply(lambda r: f'<a href="{goodreads_url(r)}" target="_blank">Goodreads</a>', axis=1)
-    t = t.rename(columns={
-        "title":"Título","author":"Autor","pub_year":"Publicado",
-        "date_read":"Leído","my_rating":"Rating","pages":"Páginas",
+    tbl = df_src[cols_show].copy()
+    tbl["🔗"] = df_src.apply(lambda r: f'<a href="{goodreads_url(r)}" target="_blank">Goodreads</a>', axis=1)
+    tbl = tbl.rename(columns={
+        "title":     t("col_title"),
+        "author":    t("col_author"),
+        "pub_year":  t("col_pub_year"),
+        "date_read": t("col_date_read"),
+        "my_rating": t("col_rating"),
+        "pages":     t("col_pages"),
     })
-    if "Leído" in t.columns:
-        t = t.sort_values("Leído", ascending=False)
-        t["Leído"] = t["Leído"].dt.strftime("%b %Y")
-    if "Publicado" in t.columns:
-        t["Publicado"] = t["Publicado"].fillna(0).astype(int)
-    st.write(t.to_html(escape=False, index=False), unsafe_allow_html=True)
+    date_col = t("col_date_read")
+    pub_col  = t("col_pub_year")
+    if date_col in tbl.columns:
+        tbl = tbl.sort_values(date_col, ascending=False)
+        tbl[date_col] = tbl[date_col].dt.strftime(t("date_format"))
+    if pub_col in tbl.columns:
+        tbl[pub_col] = tbl[pub_col].fillna(0).astype(int)
+    st.write(tbl.to_html(escape=False, index=False), unsafe_allow_html=True)
 
+
+# ════════════════════════════════════════════════════════════════════════════
+# IDIOMA — selector antes de todo
+# ════════════════════════════════════════════════════════════════════════════
+with st.sidebar:
+    lang_label = st.selectbox(
+        "🌐 Idioma / Language",
+        options=list(LANGUAGES.keys()),
+        index=0,
+        key="lang_selector",
+    )
+    lang_code = LANGUAGES[lang_label]
+    st.session_state["locale"] = load_locale(lang_code)
 
 # ════════════════════════════════════════════════════════════════════════════
 # HEADER
 # ════════════════════════════════════════════════════════════════════════════
-st.markdown("# 📚 Goodreads Explorer")
-st.markdown("*Tu historial de lectura con zoom interactivo, ranking de autores y estadísticas detalladas.*")
+st.markdown(f"# 📚 {t('app_title')}")
+st.markdown(f"*{t('app_subtitle')}*")
 st.divider()
 
 # ── Sidebar: carga + filtros ──────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("### 📂 Cargar datos")
+    st.markdown(f"### 📂 {t('sidebar_load')}")
     uploaded = st.file_uploader(
-        "CSV de Goodreads",
+        t("sidebar_upload_label"),
         type=["csv"],
-        help="My Books → Import/Export → Export Library",
+        help=t("sidebar_upload_help"),
     )
     st.markdown("---")
-    st.markdown(
-        "**¿Cómo exportar?**\n\n"
-        "1. Entrá a [goodreads.com](https://www.goodreads.com)\n"
-        "2. My Books → Import/Export\n"
-        "3. Export Library\n"
-        "4. Subí el archivo acá ↑"
-    )
+    st.markdown(f"**{t('sidebar_how_to')}**\n\n{t('sidebar_how_to_steps')}")
 
 if not uploaded:
-    st.info("👈 Subí tu CSV de Goodreads desde el panel izquierdo para comenzar.")
+    st.info(t("no_file"))
     st.stop()
 
 df = load_data(uploaded)
 
 if df.empty:
-    st.warning("No se encontraron libros marcados como 'read'.")
+    st.warning(t("no_read_books"))
     st.stop()
 
 # Sidebar filtros (después de cargar datos)
 with st.sidebar:
-    st.markdown("### 🔎 Filtros")
+    st.markdown(f"### 🔎 {t('sidebar_filters')}")
 
     # Año de lectura
     if df["read_year"].notna().any():
         yr_min, yr_max = int(df["read_year"].min()), int(df["read_year"].max())
-        yr_range = st.slider("Año de lectura", yr_min, yr_max, (yr_min, yr_max))
+        yr_range = st.slider(t("sidebar_read_year"), yr_min, yr_max, (yr_min, yr_max))
     else:
         yr_range = None
 
@@ -227,21 +255,21 @@ with st.sidebar:
     if df["pub_year"].notna().any():
         pub_min = int(df["pub_year"].dropna().min())
         pub_max = int(df["pub_year"].dropna().max())
-        pub_range = st.slider("Año de publicación", pub_min, pub_max, (pub_min, pub_max))
+        pub_range = st.slider(t("sidebar_pub_year"), pub_min, pub_max, (pub_min, pub_max))
     else:
         pub_range = None
 
-    # Géneros (todos los únicos)
+    # Géneros
     all_genres = sorted(set(g for lst in df["genre_list"] for g in lst if g))
-    genres_sel = st.multiselect("Géneros", all_genres, default=all_genres)
+    genres_sel = st.multiselect(t("sidebar_genres"), all_genres, default=all_genres)
 
     # Rating
     ratings_all = sorted(df["my_rating"].dropna().unique().tolist())
     ratings_sel = st.multiselect(
-        "Mi rating ⭐",
+        t("sidebar_rating"),
         options=ratings_all,
         default=ratings_all,
-        format_func=lambda x: f"{'⭐'*int(x)} ({int(x)})" if x > 0 else "Sin rating",
+        format_func=lambda x: f"{'⭐'*int(x)} ({int(x)})" if x > 0 else t("no_rating"),
     )
 
 # Aplicar filtros
@@ -260,25 +288,25 @@ dff = df[mask].copy()
 # ════════════════════════════════════════════════════════════════════════════
 # MÉTRICAS GLOBALES
 # ════════════════════════════════════════════════════════════════════════════
-st.markdown('<div class="section-title">Resumen</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="section-title">{t("summary_title")}</div>', unsafe_allow_html=True)
 c1, c2, c3, c4, c5, c6 = st.columns(6)
-metric_card(c1, f"{len(dff):,}", "Libros leídos")
+metric_card(c1, f"{len(dff):,}", t("metric_books"))
 
 total_pages = int(dff["pages"].sum(skipna=True))
-metric_card(c2, f"{total_pages:,}", "Páginas totales")
+metric_card(c2, f"{total_pages:,}", t("metric_pages"))
 
-metric_card(c3, dff["author"].nunique(), "Autores únicos")
+metric_card(c3, dff["author"].nunique(), t("metric_authors"))
 
 rated = dff[dff["my_rating"] > 0]["my_rating"]
 avg_r = rated.mean() if len(rated) else 0
-metric_card(c4, f"{avg_r:.1f} ⭐", "Rating promedio")
+metric_card(c4, f"{avg_r:.1f} ⭐", t("metric_rating"))
 
 top_author = dff["author"].value_counts().idxmax() if len(dff) else "—"
 top_count  = dff["author"].value_counts().max() if len(dff) else 0
-metric_card(c5, str(top_count), f"Más leído: {top_author.split(',')[0]}")
+metric_card(c5, str(top_count), f"{t('metric_top_author')}: {top_author.split(',')[0]}")
 
 fav5 = len(dff[dff["my_rating"] == 5])
-metric_card(c6, fav5, "Libros con 5 ⭐")
+metric_card(c6, fav5, t("metric_five_stars"))
 
 st.divider()
 
@@ -286,10 +314,10 @@ st.divider()
 # TABS
 # ════════════════════════════════════════════════════════════════════════════
 tab1, tab2, tab3, tab4 = st.tabs([
-    "🔭 Publicación vs Lectura",
-    "👤 Autores",
-    "📅 Historial & Páginas",
-    "🏷️ Géneros & Rankings",
+    t("tab_scatter"),
+    t("tab_authors"),
+    t("tab_history"),
+    t("tab_genres"),
 ])
 
 
@@ -297,11 +325,7 @@ tab1, tab2, tab3, tab4 = st.tabs([
 # TAB 1: SCATTER interactivo
 # ─────────────────────────────────────────────────────────────────────────────
 with tab1:
-    st.markdown(
-        "Cada punto es un libro. **Zoom**: arrastrá un rectángulo con el mouse o usá la rueda. "
-        "**Pan**: arrastrá con botón izquierdo luego de hacer zoom. "
-        "**Reset**: doble clic."
-    )
+    st.markdown(t("scatter_hint"))
 
     scatter_df = dff.dropna(subset=["pub_year", "date_read"]).copy()
     scatter_df["read_float"] = (
@@ -317,26 +341,25 @@ with tab1:
 
     # Construir hover text
     def hover_text(row):
-        rating_str = "⭐" * int(row.get("my_rating", 0)) if row.get("my_rating", 0) > 0 else "sin rating"
-        pages_str  = f"{int(row['pages'])} págs" if pd.notna(row.get("pages")) else ""
+        rating_str = "⭐" * int(row.get("my_rating", 0)) if row.get("my_rating", 0) > 0 else t("card_no_rating")
+        pages_str  = f"{int(row['pages'])} {t('col_pages').lower()}" if pd.notna(row.get("pages")) else ""
         genre_str  = ", ".join(row.get("genre_list", []))
         url        = goodreads_url(row)
         parts = [
             f"<b>{row['title']}</b>",
             f"{row['author']}",
-            f"Publicado: {int(row['pub_year'])}",
-            f"Leído: {row['date_read'].strftime('%b %Y')}",
+            f"{t('card_published')}: {int(row['pub_year'])}",
+            f"{t('card_read')}: {row['date_read'].strftime(t('date_format'))}",
             f"{rating_str}",
         ]
         if pages_str:  parts.append(pages_str)
         if genre_str:  parts.append(genre_str)
-        parts.append(f"<a href='{url}' target='_blank'>🔗 Ver en Goodreads</a>")
+        parts.append(f"<a href='{url}' target='_blank'>{t('card_link')}</a>")
         return "<br>".join(parts)
 
     scatter_df["hover"] = scatter_df.apply(hover_text, axis=1)
 
-    # Construir un trace por cada género considerando TODOS los géneros del libro,
-    # no solo el primero. Un libro con [sci-fi, favorites] aparece en ambos traces.
+    # Construir un trace por cada género considerando TODOS los géneros del libro
     fig = go.Figure()
 
     all_scatter_genres = sorted(set(g for lst in scatter_df["genre_list"] for g in lst if g))
@@ -367,27 +390,27 @@ with tab1:
         height=620,
         width=620,
         xaxis=dict(
-            title="Año de lectura",
+            title=t("scatter_x"),
             tickformat="d",
             gridcolor="#ebebeb",
             zeroline=False,
             range=[x_min, x_max],
         ),
         yaxis=dict(
-            title="Año de publicación",
+            title=t("scatter_y"),
             gridcolor="#ebebeb",
             zeroline=False,
             range=[y_min, y_max],
         ),
         legend=dict(
-            title="Géneros",
+            title=t("scatter_legend"),
             orientation="v",
             bgcolor="rgba(255,255,255,0.9)",
             bordercolor="#ddd",
             borderwidth=1,
         ),
         dragmode="zoom",
-        title="Año de publicación vs. año de lectura",
+        title=t("scatter_title"),
     )
 
     sel_scatter = st.plotly_chart(fig, use_container_width=True,
@@ -398,7 +421,6 @@ with tab1:
         pts = sel_scatter.selection.get("points", [])
         if pts:
             pt = pts[0]
-            # Buscar el libro por coordenadas
             read_val = pt.get("x")
             pub_val  = pt.get("y")
             match = scatter_df[
@@ -406,7 +428,6 @@ with tab1:
                 (scatter_df["pub_year"] == pub_val)
             ]
             if match.empty:
-                # Fallback: el punto más cercano
                 scatter_df["_dist"] = (
                     (scatter_df["read_float"] - read_val).abs() +
                     (scatter_df["pub_year"]   - pub_val).abs()
@@ -415,8 +436,8 @@ with tab1:
 
             if not match.empty:
                 row = match.iloc[0]
-                rating_str = "⭐" * int(row.get("my_rating", 0)) if row.get("my_rating", 0) > 0 else "Sin rating"
-                pages_str  = f"{int(row['pages'])} páginas" if pd.notna(row.get("pages")) else "—"
+                rating_str = "⭐" * int(row.get("my_rating", 0)) if row.get("my_rating", 0) > 0 else t("card_no_rating")
+                pages_str  = f"{int(row['pages'])} {t('col_pages').lower()}" if pd.notna(row.get("pages")) else "—"
                 genres_str = ", ".join(row.get("genre_list", [])) or "—"
                 url        = goodreads_url(row)
 
@@ -437,36 +458,38 @@ with tab1:
                         {row['author']}
                     </div>
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem 2rem; font-size:0.88rem;">
-                        <span>📅 Publicado: <b>{int(row['pub_year'])}</b></span>
-                        <span>📖 Leído: <b>{row['date_read'].strftime('%b %Y')}</b></span>
-                        <span>⭐ Rating: <b>{rating_str}</b></span>
-                        <span>📄 Páginas: <b>{pages_str}</b></span>
-                        <span style="grid-column:1/-1">🏷️ Géneros: <b>{genres_str}</b></span>
+                        <span>📅 {t('card_published')}: <b>{int(row['pub_year'])}</b></span>
+                        <span>📖 {t('card_read')}: <b>{row['date_read'].strftime(t('date_format'))}</b></span>
+                        <span>⭐ {t('card_rating')}: <b>{rating_str}</b></span>
+                        <span>📄 {t('card_pages')}: <b>{pages_str}</b></span>
+                        <span style="grid-column:1/-1">🏷️ {t('card_genres')}: <b>{genres_str}</b></span>
                     </div>
                     <div style="margin-top:0.9rem;">
                         <a href="{url}" target="_blank" style="
                             background:#e94560; color:white; padding:0.4rem 1rem;
                             border-radius:6px; text-decoration:none; font-size:0.85rem;
-                        ">🔗 Ver en Goodreads</a>
+                        ">{t('card_link')}</a>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
     except Exception:
         pass
 
-    with st.expander("Ver tabla completa de libros"):
+    with st.expander(t("scatter_table_expander")):
         cols_show = [c for c in ["title","author","pub_year","date_read","my_rating","pages","primary_genre"] if c in dff.columns]
         show_df = dff[cols_show].copy()
         show_df["goodreads"] = dff.apply(lambda r: f'<a href="{goodreads_url(r)}" target="_blank">🔗</a>', axis=1)
         show_df = show_df.rename(columns={
-            "title":"Título","author":"Autor","pub_year":"Publicado",
-            "date_read":"Leído","my_rating":"Rating","pages":"Páginas",
-            "primary_genre":"Género","goodreads":"Goodreads"
-        }).sort_values("Leído", ascending=False)
-        if "Leído" in show_df.columns:
-            show_df["Leído"] = show_df["Leído"].dt.strftime("%b %Y")
-        if "Publicado" in show_df.columns:
-            show_df["Publicado"] = show_df["Publicado"].fillna(0).astype(int)
+            "title": t("col_title"), "author": t("col_author"), "pub_year": t("col_pub_year"),
+            "date_read": t("col_date_read"), "my_rating": t("col_rating"), "pages": t("col_pages"),
+            "primary_genre": t("col_genre"), "goodreads": t("col_goodreads"),
+        }).sort_values(t("col_date_read"), ascending=False)
+        date_col = t("col_date_read")
+        if date_col in show_df.columns:
+            show_df[date_col] = show_df[date_col].dt.strftime(t("date_format"))
+        pub_col = t("col_pub_year")
+        if pub_col in show_df.columns:
+            show_df[pub_col] = show_df[pub_col].fillna(0).astype(int)
         st.write(show_df.to_html(escape=False, index=False), unsafe_allow_html=True)
 
 
@@ -474,61 +497,66 @@ with tab1:
 # TAB 2: AUTORES
 # ─────────────────────────────────────────────────────────────────────────────
 with tab2:
-    st.caption("💡 Hacé clic en una barra para ver los libros de ese autor.")
-    top_n = st.slider("Mostrar top N", 5, 30, 15, key="top_n")
+    st.caption(t("authors_hint"))
+    top_n = st.slider(t("authors_top_n"), 5, 30, 15, key="top_n")
 
     col_a, col_b, col_c2 = st.columns(3)
 
     # ── Preparar los tres datasets ───────────────────────────────────────────
+    bks_label  = t("col_books")
+    pgs_label  = t("col_pages")
+    rat_label  = t("col_rating")
+    auth_label = t("col_author")
+
     auth_cnt = (
         dff["author"].value_counts().head(top_n)
-        .reset_index().rename(columns={"count":"Libros","author":"Autor"})
+        .reset_index().rename(columns={"count": bks_label, "author": auth_label})
     )
 
     auth_pag = (
         dff[dff["pages"].notna()]
         .groupby("author")["pages"].sum()
         .sort_values(ascending=False).head(top_n)
-        .reset_index().rename(columns={"author":"Autor","pages":"Páginas"})
+        .reset_index().rename(columns={"author": auth_label, "pages": pgs_label})
     )
-    auth_pag["Páginas"] = auth_pag["Páginas"].astype(int)
+    auth_pag[pgs_label] = auth_pag[pgs_label].astype(int)
 
     auth_rat = (
         dff[dff["my_rating"] > 0]
         .groupby("author")
-        .agg(Libros=("title","count"), Rating=("my_rating","mean"))
-        .query("Libros >= 2")
-        .sort_values("Rating", ascending=False)
+        .agg(**{bks_label: ("title","count"), rat_label: ("my_rating","mean")})
+        .query(f"`{bks_label}` >= 2")
+        .sort_values(rat_label, ascending=False)
         .head(top_n).reset_index()
-        .rename(columns={"author":"Autor"})
+        .rename(columns={"author": auth_label})
     )
-    auth_rat["Rating"] = auth_rat["Rating"].round(2)
+    auth_rat[rat_label] = auth_rat[rat_label].round(2)
 
     chart_h = max(380, top_n * 28)
 
     with col_a:
-        st.markdown('<div class="section-title">Por libros leídos</div>', unsafe_allow_html=True)
-        fig_a = px.bar(auth_cnt, x="Libros", y="Autor", orientation="h",
-                       color="Libros", color_continuous_scale=[BLUE, RED])
+        st.markdown(f'<div class="section-title">{t("authors_by_books")}</div>', unsafe_allow_html=True)
+        fig_a = px.bar(auth_cnt, x=bks_label, y=auth_label, orientation="h",
+                       color=bks_label, color_continuous_scale=[BLUE, RED])
         fig_a.update_layout(**LAYOUT_BASE, height=chart_h,
                             yaxis=dict(autorange="reversed"), coloraxis_showscale=False)
         sel_a = st.plotly_chart(fig_a, use_container_width=True,
                                 on_select="rerun", key="chart_authors_count")
 
     with col_b:
-        st.markdown('<div class="section-title">Por páginas leídas</div>', unsafe_allow_html=True)
-        fig_b2 = px.bar(auth_pag, x="Páginas", y="Autor", orientation="h",
-                        color="Páginas", color_continuous_scale=[BLUE, GREEN])
+        st.markdown(f'<div class="section-title">{t("authors_by_pages")}</div>', unsafe_allow_html=True)
+        fig_b2 = px.bar(auth_pag, x=pgs_label, y=auth_label, orientation="h",
+                        color=pgs_label, color_continuous_scale=[BLUE, GREEN])
         fig_b2.update_layout(**LAYOUT_BASE, height=chart_h,
                              yaxis=dict(autorange="reversed"), coloraxis_showscale=False)
         sel_b2 = st.plotly_chart(fig_b2, use_container_width=True,
                                  on_select="rerun", key="chart_authors_pages")
 
     with col_c2:
-        st.markdown('<div class="section-title">Por rating promedio (≥2 libros)</div>', unsafe_allow_html=True)
-        fig_b = px.bar(auth_rat, x="Rating", y="Autor", orientation="h",
-                       color="Rating", color_continuous_scale=["#e94560", "#f5a623", "#53c28b"],
-                       range_x=[0, 5.3], hover_data={"Libros": True})
+        st.markdown(f'<div class="section-title">{t("authors_by_rating")}</div>', unsafe_allow_html=True)
+        fig_b = px.bar(auth_rat, x=rat_label, y=auth_label, orientation="h",
+                       color=rat_label, color_continuous_scale=["#e94560", "#f5a623", "#53c28b"],
+                       range_x=[0, 5.3], hover_data={bks_label: True})
         fig_b.update_layout(**LAYOUT_BASE, height=chart_h,
                             yaxis=dict(autorange="reversed"), coloraxis_showscale=False)
         sel_b = st.plotly_chart(fig_b, use_container_width=True,
@@ -537,41 +565,41 @@ with tab2:
     # ── Tabla al hacer clic ──────────────────────────────────────────────────
     selected_author = None
 
-    for sel, df_ref, col_name in [
-        (sel_a,  auth_cnt, "Autor"),
-        (sel_b2, auth_pag, "Autor"),
-        (sel_b,  auth_rat, "Autor"),
+    for sel, df_ref in [
+        (sel_a,  auth_cnt),
+        (sel_b2, auth_pag),
+        (sel_b,  auth_rat),
     ]:
         try:
             pts = sel.selection.get("points", [])
             if pts:
                 idx = pts[0].get("point_index", None)
                 if idx is not None:
-                    selected_author = df_ref.iloc[idx][col_name]
+                    selected_author = df_ref.iloc[idx][auth_label]
                     break
         except Exception:
             pass
 
     if selected_author:
-        st.markdown(f'<div class="section-title">📚 Libros de {selected_author}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-title">{t("authors_selected_title")} {selected_author}</div>', unsafe_allow_html=True)
         author_books = dff[dff["author"] == selected_author].copy()
         show_books_table(author_books)
     else:
-        # Tabla resumen completa por defecto
-        st.markdown('<div class="section-title">Detalle completo por autor</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-title">{t("authors_detail_title")}</div>', unsafe_allow_html=True)
         agg = {"title": "count"}
         if "pages"     in dff.columns: agg["pages"]     = "sum"
         if "my_rating" in dff.columns: agg["my_rating"] = "mean"
         auth_table = (
             dff.groupby("author").agg(agg)
-            .rename(columns={"title":"Libros","pages":"Páginas","my_rating":"Rating prom."})
-            .sort_values("Libros", ascending=False).reset_index()
-            .rename(columns={"author":"Autor"})
+            .rename(columns={"title": bks_label, "pages": pgs_label, "my_rating": t("col_rating_avg")})
+            .sort_values(bks_label, ascending=False).reset_index()
+            .rename(columns={"author": auth_label})
         )
-        if "Rating prom." in auth_table.columns:
-            auth_table["Rating prom."] = auth_table["Rating prom."].round(2)
-        if "Páginas" in auth_table.columns:
-            auth_table["Páginas"] = auth_table["Páginas"].fillna(0).astype(int)
+        rat_avg_col = t("col_rating_avg")
+        if rat_avg_col in auth_table.columns:
+            auth_table[rat_avg_col] = auth_table[rat_avg_col].round(2)
+        if pgs_label in auth_table.columns:
+            auth_table[pgs_label] = auth_table[pgs_label].fillna(0).astype(int)
         st.dataframe(auth_table, use_container_width=True, height=320)
 
 
@@ -579,29 +607,29 @@ with tab2:
 # TAB 3: HISTORIAL & PÁGINAS
 # ─────────────────────────────────────────────────────────────────────────────
 with tab3:
-    st.caption("💡 Hacé clic en una barra para ver los libros de ese año o mes.")
+    st.caption(t("history_hint"))
     col_c, col_d = st.columns(2)
 
-    MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"]
+    MESES = t("months")
 
     with col_c:
-        st.markdown('<div class="section-title">Libros leídos por año</div>', unsafe_allow_html=True)
-        by_yr = dff.groupby("read_year").size().reset_index(name="Libros").dropna()
+        st.markdown(f'<div class="section-title">{t("history_books_year")}</div>', unsafe_allow_html=True)
+        by_yr = dff.groupby("read_year").size().reset_index(name=bks_label).dropna()
         by_yr["read_year"] = by_yr["read_year"].astype(int)
-        fig_yr = px.bar(by_yr, x="read_year", y="Libros",
-                        color="Libros", color_continuous_scale=[BLUE, RED],
-                        labels={"read_year":"Año"})
+        fig_yr = px.bar(by_yr, x="read_year", y=bks_label,
+                        color=bks_label, color_continuous_scale=[BLUE, RED],
+                        labels={"read_year": t("col_year")})
         fig_yr.update_layout(**LAYOUT_BASE, height=300, coloraxis_showscale=False)
         sel_yr = st.plotly_chart(fig_yr, use_container_width=True,
                                  on_select="rerun", key="chart_by_year")
 
     with col_d:
-        st.markdown('<div class="section-title">Libros por mes (acumulado todos los años)</div>', unsafe_allow_html=True)
-        by_mo = dff.groupby("read_month").size().reset_index(name="Libros").dropna()
-        by_mo["Mes"] = by_mo["read_month"].apply(lambda x: MESES[int(x)-1])
-        fig_mo = px.bar(by_mo, x="Mes", y="Libros",
-                        color="Libros", color_continuous_scale=[BLUE, RED],
-                        category_orders={"Mes": MESES})
+        st.markdown(f'<div class="section-title">{t("history_books_month")}</div>', unsafe_allow_html=True)
+        by_mo = dff.groupby("read_month").size().reset_index(name=bks_label).dropna()
+        by_mo[t("col_month")] = by_mo["read_month"].apply(lambda x: MESES[int(x)-1])
+        fig_mo = px.bar(by_mo, x=t("col_month"), y=bks_label,
+                        color=bks_label, color_continuous_scale=[BLUE, RED],
+                        category_orders={t("col_month"): MESES})
         fig_mo.update_layout(**LAYOUT_BASE, height=300, coloraxis_showscale=False)
         sel_mo = st.plotly_chart(fig_mo, use_container_width=True,
                                  on_select="rerun", key="chart_by_month")
@@ -616,7 +644,7 @@ with tab3:
             idx = pts[0].get("point_index", None)
             if idx is not None:
                 yr_val = int(by_yr.iloc[idx]["read_year"])
-                selected_label = f"📅 Libros leídos en {yr_val}"
+                selected_label = f"{t('history_selected_year')} {yr_val}"
                 filtered_books = dff[dff["read_year"] == yr_val]
     except Exception:
         pass
@@ -628,7 +656,7 @@ with tab3:
                 idx = pts[0].get("point_index", None)
                 if idx is not None:
                     mo_val = int(by_mo.iloc[idx]["read_month"])
-                    selected_label = f"📅 Libros leídos en {MESES[mo_val-1]}"
+                    selected_label = f"{t('history_selected_month')} {MESES[mo_val-1]}"
                     filtered_books = dff[dff["read_month"] == mo_val]
         except Exception:
             pass
@@ -638,15 +666,15 @@ with tab3:
         show_books_table(filtered_books)
 
     # Curva acumulada
-    st.markdown('<div class="section-title">Libros acumulados a lo largo del tiempo</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="section-title">{t("history_cumulative")}</div>', unsafe_allow_html=True)
     cum = (
         dff.dropna(subset=["date_read"])
         .sort_values("date_read")
         .reset_index(drop=True)
     )
-    cum["Acumulado"] = range(1, len(cum)+1)
-    fig_cum = px.line(cum, x="date_read", y="Acumulado",
-                      labels={"date_read":"Fecha"},
+    cum[t("metric_books")] = range(1, len(cum)+1)
+    fig_cum = px.line(cum, x="date_read", y=t("metric_books"),
+                      labels={"date_read": t("col_date_read")},
                       hover_data={"title": True} if "title" in cum.columns else {})
     fig_cum.update_traces(line_color=RED, line_width=2.5)
     fig_cum.update_layout(**LAYOUT_BASE, height=300)
@@ -654,22 +682,21 @@ with tab3:
 
     # Páginas por año
     if "pages" in dff.columns:
-        st.markdown('<div class="section-title">Páginas leídas por año</div>', unsafe_allow_html=True)
-        pg_yr = dff.groupby("read_year")["pages"].sum().reset_index(name="Páginas").dropna()
+        st.markdown(f'<div class="section-title">{t("history_pages_year")}</div>', unsafe_allow_html=True)
+        pg_yr = dff.groupby("read_year")["pages"].sum().reset_index(name=pgs_label).dropna()
         pg_yr["read_year"] = pg_yr["read_year"].astype(int)
-        fig_pg = px.area(pg_yr, x="read_year", y="Páginas",
-                         labels={"read_year":"Año"},
+        fig_pg = px.area(pg_yr, x="read_year", y=pgs_label,
+                         labels={"read_year": t("col_year")},
                          color_discrete_sequence=[RED])
         fig_pg.update_layout(**LAYOUT_BASE, height=280)
         st.plotly_chart(fig_pg, use_container_width=True)
 
     # ── Desglose mensual ─────────────────────────────────────────────────────
     st.divider()
-    st.markdown('<div class="section-title">Desglose mensual</div>', unsafe_allow_html=True)
-    st.caption("💡 Hacé clic en una barra para ver los libros de ese mes.")
+    st.markdown(f'<div class="section-title">{t("history_monthly_title")}</div>', unsafe_allow_html=True)
+    st.caption(t("history_monthly_hint"))
 
     if dff["date_read"].notna().any():
-        # Preparar columna Año-Mes para eje X
         monthly = dff.dropna(subset=["date_read"]).copy()
         monthly["anio_mes"] = monthly["date_read"].dt.to_period("M").astype(str)
         monthly["anio_mes_dt"] = pd.to_datetime(monthly["anio_mes"])
@@ -677,15 +704,15 @@ with tab3:
         col_m1, col_m2 = st.columns(2)
 
         with col_m1:
-            st.markdown("**Libros por mes**")
+            st.markdown(f"**{t('history_books_by_month')}**")
             libros_mes = (
                 monthly.groupby("anio_mes_dt").size()
-                .reset_index(name="Libros")
+                .reset_index(name=bks_label)
                 .sort_values("anio_mes_dt")
             )
-            fig_lm = px.bar(libros_mes, x="anio_mes_dt", y="Libros",
-                            color="Libros", color_continuous_scale=[BLUE, RED],
-                            labels={"anio_mes_dt": "Mes"})
+            fig_lm = px.bar(libros_mes, x="anio_mes_dt", y=bks_label,
+                            color=bks_label, color_continuous_scale=[BLUE, RED],
+                            labels={"anio_mes_dt": t("col_month")})
             fig_lm.update_layout(**LAYOUT_BASE, height=320,
                                  coloraxis_showscale=False,
                                  xaxis=dict(tickformat="%b %Y", tickangle=-45))
@@ -694,15 +721,15 @@ with tab3:
 
         with col_m2:
             if "pages" in monthly.columns:
-                st.markdown("**Páginas por mes**")
+                st.markdown(f"**{t('history_pages_by_month')}**")
                 pags_mes = (
                     monthly.groupby("anio_mes_dt")["pages"].sum()
-                    .reset_index(name="Páginas")
+                    .reset_index(name=pgs_label)
                     .sort_values("anio_mes_dt")
                 )
-                fig_pm = px.bar(pags_mes, x="anio_mes_dt", y="Páginas",
-                                color="Páginas", color_continuous_scale=[BLUE, GREEN],
-                                labels={"anio_mes_dt": "Mes"})
+                fig_pm = px.bar(pags_mes, x="anio_mes_dt", y=pgs_label,
+                                color=pgs_label, color_continuous_scale=[BLUE, GREEN],
+                                labels={"anio_mes_dt": t("col_month")})
                 fig_pm.update_layout(**LAYOUT_BASE, height=320,
                                      coloraxis_showscale=False,
                                      xaxis=dict(tickformat="%b %Y", tickangle=-45))
@@ -711,7 +738,6 @@ with tab3:
             else:
                 sel_pm = None
 
-        # Tabla al hacer clic en los gráficos mensuales
         filtered_monthly = None
         label_monthly = None
 
@@ -724,7 +750,7 @@ with tab3:
                     idx = pts[0].get("point_index", None)
                     if idx is not None:
                         mes_dt = df_ref_m.iloc[idx]["anio_mes_dt"]
-                        label_monthly = f"📅 Libros leídos en {mes_dt.strftime('%B %Y')}"
+                        label_monthly = f"{t('history_selected_month_label')} {mes_dt.strftime(t('date_format'))}"
                         filtered_monthly = monthly[monthly["anio_mes_dt"] == mes_dt]
                         break
             except Exception:
@@ -739,25 +765,30 @@ with tab3:
 # TAB 4: GÉNEROS & RANKINGS
 # ─────────────────────────────────────────────────────────────────────────────
 with tab4:
-    st.caption("💡 Hacé clic en una barra para ver los libros de ese género, rating o década.")
+    st.caption(t("genres_hint"))
     col_e, col_f = st.columns(2)
+
+    dec_label    = t("col_decade")
+    genre_label  = t("col_genre")
+    stars_label  = t("col_stars")
+    qty_label    = t("col_quantity")
 
     # Preparar datos de década
     dec = dff.dropna(subset=["pub_year"]).copy()
-    dec["Década"] = (dec["pub_year"] // 10 * 10).astype(int).astype(str) + "s"
-    dec_cnt = dec.groupby("Década").size().reset_index(name="Libros").sort_values("Década")
+    dec[dec_label] = (dec["pub_year"] // 10 * 10).astype(int).astype(str) + "s"
+    dec_cnt = dec.groupby(dec_label).size().reset_index(name=bks_label).sort_values(dec_label)
 
     # Preparar datos de género
-    exploded = dff.explode("genre_list").rename(columns={"genre_list":"Género"})
-    exploded = exploded[exploded["Género"].notna() & (exploded["Género"] != "")]
-    genre_cnt = exploded["Género"].value_counts().reset_index()
-    genre_cnt.columns = ["Género","Libros"]
+    exploded = dff.explode("genre_list").rename(columns={"genre_list": genre_label})
+    exploded = exploded[exploded[genre_label].notna() & (exploded[genre_label] != "")]
+    genre_cnt = exploded[genre_label].value_counts().reset_index()
+    genre_cnt.columns = [genre_label, bks_label]
 
     with col_e:
-        st.markdown('<div class="section-title">Libros por género</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-title">{t("genres_by_genre")}</div>', unsafe_allow_html=True)
         fig_g = px.bar(
-            genre_cnt, x="Libros", y="Género", orientation="h",
-            color="Género", color_discrete_map=GENRE_COLORS,
+            genre_cnt, x=bks_label, y=genre_label, orientation="h",
+            color=genre_label, color_discrete_map=GENRE_COLORS,
         )
         fig_g.update_layout(
             **LAYOUT_BASE, height=max(300, len(genre_cnt)*26),
@@ -767,19 +798,19 @@ with tab4:
                                     on_select="rerun", key="chart_genres")
 
     with col_f:
-        st.markdown('<div class="section-title">Distribución de mis ratings</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-title">{t("genres_by_rating")}</div>', unsafe_allow_html=True)
         rat_df = dff[dff["my_rating"] > 0]["my_rating"].value_counts().sort_index().reset_index()
-        rat_df.columns = ["Rating","Cantidad"]
-        rat_df["Estrellas"] = rat_df["Rating"].apply(lambda x: "⭐"*int(x))
-        fig_rat = px.bar(rat_df, x="Estrellas", y="Cantidad",
-                         color="Cantidad", color_continuous_scale=[ORANGE, RED])
+        rat_df.columns = [rat_label, qty_label]
+        rat_df[stars_label] = rat_df[rat_label].apply(lambda x: "⭐"*int(x))
+        fig_rat = px.bar(rat_df, x=stars_label, y=qty_label,
+                         color=qty_label, color_continuous_scale=[ORANGE, RED])
         fig_rat.update_layout(**LAYOUT_BASE, height=300, coloraxis_showscale=False)
         sel_rat = st.plotly_chart(fig_rat, use_container_width=True,
                                   on_select="rerun", key="chart_ratings")
 
-        st.markdown('<div class="section-title">Libros por década de publicación</div>', unsafe_allow_html=True)
-        fig_dec = px.bar(dec_cnt, x="Década", y="Libros",
-                         color="Libros", color_continuous_scale=[BLUE, RED])
+        st.markdown(f'<div class="section-title">{t("genres_by_decade")}</div>', unsafe_allow_html=True)
+        fig_dec = px.bar(dec_cnt, x=dec_label, y=bks_label,
+                         color=bks_label, color_continuous_scale=[BLUE, RED])
         fig_dec.update_layout(**LAYOUT_BASE, height=280, coloraxis_showscale=False)
         sel_dec = st.plotly_chart(fig_dec, use_container_width=True,
                                   on_select="rerun", key="chart_decades")
@@ -788,41 +819,39 @@ with tab4:
     selected_label = None
     filtered_books = None
 
-    # Clic en género
     try:
         pts = sel_genre.selection.get("points", [])
         if pts:
             idx = pts[0].get("point_index", None)
             if idx is not None:
-                genre_val = genre_cnt.iloc[idx]["Género"]
-                selected_label = f"🏷️ Libros en el género: {genre_val}"
+                genre_val = genre_cnt.iloc[idx][genre_label]
+                selected_label = f"{t('genres_selected_genre')} {genre_val}"
                 filtered_books = dff[dff["genre_list"].apply(lambda lst: genre_val in lst)]
     except Exception:
         pass
 
-    # Clic en rating
     if filtered_books is None:
         try:
             pts = sel_rat.selection.get("points", [])
             if pts:
                 idx = pts[0].get("point_index", None)
                 if idx is not None:
-                    rat_val = int(rat_df.iloc[idx]["Rating"])
-                    selected_label = f"⭐ Libros con {rat_val} estrella{'s' if rat_val != 1 else ''}"
+                    rat_val = int(rat_df.iloc[idx][rat_label])
+                    star_word = t("genres_selected_rating_singular") if rat_val == 1 else t("genres_selected_rating_plural")
+                    selected_label = f"⭐ {rat_val} {star_word}"
                     filtered_books = dff[dff["my_rating"] == rat_val]
         except Exception:
             pass
 
-    # Clic en década
     if filtered_books is None:
         try:
             pts = sel_dec.selection.get("points", [])
             if pts:
                 idx = pts[0].get("point_index", None)
                 if idx is not None:
-                    dec_val = dec_cnt.iloc[idx]["Década"]
-                    selected_label = f"📅 Libros publicados en los {dec_val}"
-                    filtered_books = dec[dec["Década"] == dec_val]
+                    dec_val = dec_cnt.iloc[idx][dec_label]
+                    selected_label = f"{t('genres_selected_decade')} {dec_val}"
+                    filtered_books = dec[dec[dec_label] == dec_val]
         except Exception:
             pass
 
@@ -830,19 +859,19 @@ with tab4:
         st.markdown(f'<div class="section-title">{selected_label}</div>', unsafe_allow_html=True)
         show_books_table(filtered_books)
 
-    # Rankings especiales (siempre visibles)
-    st.markdown('<div class="section-title">🏆 Rankings especiales</div>', unsafe_allow_html=True)
+    # Rankings especiales
+    st.markdown(f'<div class="section-title">{t("rankings_title")}</div>', unsafe_allow_html=True)
     r1, r2, r3 = st.columns(3)
 
     with r1:
-        st.markdown("**📖 Libros más largos**")
+        st.markdown(f"**{t('rankings_longest')}**")
         if "pages" in dff.columns:
             show_books_table(dff.dropna(subset=["pages"]).nlargest(8, "pages"))
 
     with r2:
-        st.markdown("**⭐ Tus 5 estrellas**")
+        st.markdown(f"**{t('rankings_five_stars')}**")
         show_books_table(dff[dff["my_rating"] == 5])
 
     with r3:
-        st.markdown("**📅 Últimos leídos**")
+        st.markdown(f"**{t('rankings_recent')}**")
         show_books_table(dff.dropna(subset=["date_read"]).nlargest(10, "date_read"))
