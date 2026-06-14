@@ -100,6 +100,11 @@ GENRE_COLORS = {
     "geopolitics": "#073b4c", "fulbo": "#2d6a4f", "vampire": "#9d0208",
 }
 
+# ── Aliases de autores — agregar acá cualquier nombre duplicado ───────────────
+AUTHOR_ALIASES = {
+    "Julio Verne": "Jules Verne",
+}
+
 # ── Carga y limpieza ──────────────────────────────────────────────────────────
 @st.cache_data
 def load_data(file):
@@ -117,6 +122,10 @@ def load_data(file):
         "ISBN": "isbn", "ISBN13": "isbn13",
     }
     df = df.rename(columns={k: v for k, v in col_map.items() if k in df.columns})
+
+    # Normalizar aliases de autores
+    if "author" in df.columns:
+        df["author"] = df["author"].replace(AUTHOR_ALIASES)
 
     # Fechas
     df["date_read"]  = pd.to_datetime(df.get("date_read"),  errors="coerce")
