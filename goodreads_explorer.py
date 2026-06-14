@@ -270,7 +270,8 @@ with st.sidebar:
 
     # Géneros
     all_genres = sorted(set(g for lst in df["genre_list"] for g in lst if g))
-    genres_sel = st.multiselect(t("sidebar_genres"), all_genres, default=all_genres)
+    all_genres_with_none = all_genres + ["sin categoría"]
+    genres_sel = st.multiselect(t("sidebar_genres"), all_genres_with_none, default=all_genres_with_none)
 
     # Rating
     ratings_all = sorted(df["my_rating"].dropna().unique().tolist())
@@ -287,8 +288,11 @@ if yr_range:
     mask &= df["read_year"].between(*yr_range)
 if pub_range:
     mask &= df["pub_year"].fillna(9999).between(*pub_range)
-if genres_sel and len(genres_sel) < len(all_genres):
-    mask &= df["genre_list"].apply(lambda lst: any(g in genres_sel for g in lst))
+if genres_sel and len(genres_sel) < len(all_genres_with_none):
+    include_none = "sin categoría" in genres_sel
+    mask &= df["genre_list"].apply(
+        lambda lst: (any(g in genres_sel for g in lst)) or (include_none and lst == [])
+    )
 if ratings_sel is not None:
     mask &= df["my_rating"].isin(ratings_sel)
 
