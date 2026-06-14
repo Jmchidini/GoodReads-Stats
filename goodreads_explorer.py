@@ -40,45 +40,87 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Source+Sans+3:wght@300;400;600&display=swap');
-html, body, [class*="css"] { font-family: 'Source Sans 3', sans-serif; }
-h1, h2, h3 { font-family: 'Playfair Display', serif !important; }
+@import url('https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&family=Merriweather:wght@700&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'Lato', sans-serif;
+    background-color: #f9f7f4;
+    color: #333333;
+}
+h1, h2, h3 { font-family: 'Merriweather', serif !important; color: #333333; }
+
+/* Sidebar */
+[data-testid="stSidebar"] {
+    background-color: #f4f1ec !important;
+    border-right: 1px solid #ddd8ce;
+}
+
+/* Metric cards — estilo Goodreads: fondo crema, borde sutil */
 .metric-card {
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-    border: 1px solid #0f3460;
-    border-radius: 12px;
+    background: #ffffff;
+    border: 1px solid #ddd8ce;
+    border-radius: 8px;
     padding: 1.2rem 1rem;
     text-align: center;
-    color: #e0e0e0;
+    color: #333333;
     height: 100%;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
 }
 .metric-card .value {
     font-size: 2rem;
     font-weight: 700;
-    color: #e94560;
-    font-family: 'Playfair Display', serif;
+    color: #382110;
+    font-family: 'Merriweather', serif;
     line-height: 1.1;
 }
 .metric-card .label {
     font-size: 0.72rem;
     text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: #8892a4;
+    letter-spacing: 0.08em;
+    color: #767676;
     margin-top: 0.3rem;
 }
+
+/* Section titles */
 .section-title {
-    font-family: 'Playfair Display', serif;
-    font-size: 1.3rem;
-    color: #1a1a2e;
-    border-left: 4px solid #e94560;
+    font-family: 'Merriweather', serif;
+    font-size: 1.2rem;
+    color: #382110;
+    border-left: 4px solid #c8a951;
     padding-left: 0.75rem;
     margin: 1.5rem 0 0.8rem;
 }
+
+/* Tabs */
+.stTabs [data-baseweb="tab-list"] { gap: 0; border-bottom: 2px solid #ddd8ce; }
+.stTabs [data-baseweb="tab"] {
+    font-family: 'Lato', sans-serif;
+    font-size: 0.9rem;
+    color: #767676;
+    padding: 0.6rem 1.2rem;
+    border-radius: 0;
+}
+.stTabs [aria-selected="true"] {
+    color: #382110 !important;
+    border-bottom: 2px solid #c8a951 !important;
+    font-weight: 700;
+}
+
+/* Botones y widgets */
+.stSlider [data-baseweb="slider"] { color: #c8a951; }
+div[data-baseweb="select"] { background-color: #ffffff; }
+
 footer { visibility: hidden; }
 </style>
 """, unsafe_allow_html=True)
 
-# ── Colores ───────────────────────────────────────────────────────────────────
+# ── Colores (solo usados en la UI, NO en los gráficos) ───────────────────────
+GR_BROWN  = "#382110"   # marrón oscuro Goodreads
+GR_GOLD   = "#c8a951"   # dorado/beige acento Goodreads
+GR_CREAM  = "#f4f1ec"   # fondo crema
+GR_BORDER = "#ddd8ce"   # bordes
+
+# Colores de gráficos — sin cambios
 RED    = "#e94560"
 DARK   = "#1a1a2e"
 BLUE   = "#0f3460"
@@ -86,11 +128,11 @@ GREEN  = "#53c28b"
 ORANGE = "#f5a623"
 
 LAYOUT_BASE = dict(
-    font=dict(family="Source Sans 3, sans-serif", color="#2d2d2d"),
+    font=dict(family="Lato, sans-serif", color="#333333"),
     paper_bgcolor="rgba(0,0,0,0)",
     plot_bgcolor="#fafafa",
     margin=dict(t=40, b=40, l=40, r=20),
-    hoverlabel=dict(bgcolor=DARK, font_color="white", font_size=13),
+    hoverlabel=dict(bgcolor=GR_BROWN, font_color="white", font_size=13),
 )
 
 GENRE_COLORS = {
@@ -456,21 +498,22 @@ with tab1:
 
                 st.markdown(f"""
                 <div style="
-                    background: linear-gradient(135deg, #1a1a2e, #16213e);
-                    border: 1px solid #0f3460;
-                    border-radius: 12px;
+                    background: #ffffff;
+                    border: 1px solid #ddd8ce;
+                    border-radius: 8px;
                     padding: 1.2rem 1.5rem;
-                    color: #e0e0e0;
+                    color: #333333;
                     max-width: 600px;
                     margin: 0.5rem 0 1rem;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
                 ">
-                    <div style="font-size:1.2rem; font-weight:700; color:#e94560; margin-bottom:0.4rem;">
+                    <div style="font-size:1.2rem; font-weight:700; color:#382110; margin-bottom:0.4rem; font-family:'Merriweather',serif;">
                         {row['title']}
                     </div>
-                    <div style="font-size:0.95rem; color:#b0b8c8; margin-bottom:0.8rem;">
+                    <div style="font-size:0.95rem; color:#767676; margin-bottom:0.8rem;">
                         {row['author']}
                     </div>
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem 2rem; font-size:0.88rem;">
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem 2rem; font-size:0.88rem; color:#333333;">
                         <span>📅 {t('card_published')}: <b>{int(row['pub_year'])}</b></span>
                         <span>📖 {t('card_read')}: <b>{row['date_read'].strftime(t('date_format'))}</b></span>
                         <span>⭐ {t('card_rating')}: <b>{rating_str}</b></span>
@@ -479,8 +522,8 @@ with tab1:
                     </div>
                     <div style="margin-top:0.9rem;">
                         <a href="{url}" target="_blank" style="
-                            background:#e94560; color:white; padding:0.4rem 1rem;
-                            border-radius:6px; text-decoration:none; font-size:0.85rem;
+                            background:#382110; color:#f4f1ec; padding:0.4rem 1rem;
+                            border-radius:4px; text-decoration:none; font-size:0.85rem;
                         ">{t('card_link')}</a>
                     </div>
                 </div>
