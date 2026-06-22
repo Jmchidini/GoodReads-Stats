@@ -89,5 +89,8 @@
   "date_format": "%b %Y",
   "date_format_long": "%d %b %Y",
   "language_selector": "Idioma / Language",
-  "sidebar_no_data": "Load the CSV first"
+  "sidebar_no_data": "Load the CSV first",
+  "sidebar_format_filters": "🎌 Format",
+  "exclude_manga": "Exclude manga from count",
+  "exclude_light_novel": "Exclude light novels from count"
 }

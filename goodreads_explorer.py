@@ -324,6 +324,11 @@ with st.sidebar:
         format_func=lambda x: f"{'⭐'*int(x)} ({int(x)})" if x > 0 else t("no_rating"),
     )
 
+    st.markdown("---")
+    st.markdown(f"### {t('sidebar_format_filters')}")
+    exclude_manga = st.checkbox(t("exclude_manga"))
+    exclude_light_novel = st.checkbox(t("exclude_light_novel"))
+
 # Aplicar filtros
 mask = pd.Series([True] * len(df), index=df.index)
 if yr_range:
@@ -337,6 +342,10 @@ if genres_sel and len(genres_sel) < len(all_genres_with_none):
     )
 if ratings_sel is not None:
     mask &= df["my_rating"].isin(ratings_sel)
+if exclude_manga:
+    mask &= df["genre_list"].apply(lambda lst: "manga" not in lst)
+if exclude_light_novel:
+    mask &= df["genre_list"].apply(lambda lst: "light-novel" not in lst)
 
 dff = df[mask].copy()
 
