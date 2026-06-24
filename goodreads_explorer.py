@@ -851,10 +851,11 @@ with tab4:
 
     with col_e:
         st.markdown(f'<div class="section-title">{t("genres_by_genre")}</div>', unsafe_allow_html=True)
+        bar_colors = [GENRE_COLORS.get(g, "#888888") for g in genre_cnt[genre_label]]
         fig_g = px.bar(
             genre_cnt, x=bks_label, y=genre_label, orientation="h",
-            color=genre_label, color_discrete_map=GENRE_COLORS,
         )
+        fig_g.update_traces(marker_color=bar_colors)
         fig_g.update_layout(
             **LAYOUT_BASE, height=max(300, len(genre_cnt)*26),
             yaxis=dict(autorange="reversed"), showlegend=False,
