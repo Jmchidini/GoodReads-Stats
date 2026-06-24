@@ -601,19 +601,19 @@ with tab2:
 
     with col_a:
         st.markdown(f'<div class="section-title">{t("authors_by_books")}</div>', unsafe_allow_html=True)
-        fig_a = px.bar(auth_cnt, x=bks_label, y=auth_label, orientation="h",
-                       color=bks_label, color_continuous_scale=[BLUE, RED])
+        fig_a = px.bar(auth_cnt, x=bks_label, y=auth_label, orientation="h")
+        fig_a.update_traces(marker_color=BLUE)
         fig_a.update_layout(**LAYOUT_BASE, height=chart_h,
-                            yaxis=dict(autorange="reversed"), coloraxis_showscale=False)
+                            yaxis=dict(autorange="reversed"))
         sel_a = st.plotly_chart(fig_a, use_container_width=True,
                                 on_select="rerun", key="chart_authors_count")
 
     with col_b:
         st.markdown(f'<div class="section-title">{t("authors_by_pages")}</div>', unsafe_allow_html=True)
-        fig_b2 = px.bar(auth_pag, x=pgs_label, y=auth_label, orientation="h",
-                        color=pgs_label, color_continuous_scale=[BLUE, GREEN])
+        fig_b2 = px.bar(auth_pag, x=pgs_label, y=auth_label, orientation="h")
+        fig_b2.update_traces(marker_color=BLUE)
         fig_b2.update_layout(**LAYOUT_BASE, height=chart_h,
-                             yaxis=dict(autorange="reversed"), coloraxis_showscale=False)
+                             yaxis=dict(autorange="reversed"))
         sel_b2 = st.plotly_chart(fig_b2, use_container_width=True,
                                  on_select="rerun", key="chart_authors_pages")
 
