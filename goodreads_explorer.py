@@ -682,9 +682,9 @@ with tab3:
         by_yr = dff.groupby("read_year").size().reset_index(name=bks_label).dropna()
         by_yr["read_year"] = by_yr["read_year"].astype(int)
         fig_yr = px.bar(by_yr, x="read_year", y=bks_label,
-                        color=bks_label, color_continuous_scale=[BLUE, RED],
                         labels={"read_year": t("col_year")})
-        fig_yr.update_layout(**LAYOUT_BASE, height=300, coloraxis_showscale=False)
+        fig_yr.update_traces(marker_color=BLUE)
+        fig_yr.update_layout(**LAYOUT_BASE, height=300)
         sel_yr = st.plotly_chart(fig_yr, use_container_width=True,
                                  on_select="rerun", key="chart_by_year")
 
@@ -693,9 +693,9 @@ with tab3:
         by_mo = dff.groupby("read_month").size().reset_index(name=bks_label).dropna()
         by_mo[t("col_month")] = by_mo["read_month"].apply(lambda x: MESES[int(x)-1])
         fig_mo = px.bar(by_mo, x=t("col_month"), y=bks_label,
-                        color=bks_label, color_continuous_scale=[BLUE, RED],
                         category_orders={t("col_month"): MESES})
-        fig_mo.update_layout(**LAYOUT_BASE, height=300, coloraxis_showscale=False)
+        fig_mo.update_traces(marker_color=BLUE)
+        fig_mo.update_layout(**LAYOUT_BASE, height=300)
         sel_mo = st.plotly_chart(fig_mo, use_container_width=True,
                                  on_select="rerun", key="chart_by_month")
 
