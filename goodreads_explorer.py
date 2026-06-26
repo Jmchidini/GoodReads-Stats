@@ -30,6 +30,37 @@ def t(key: str) -> str:
     """Retorna el string traducido para la clave dada."""
     return st.session_state.get("locale", {}).get(key, key)
 
+@st.cache_data
+def load_author_countries() -> dict:
+    """Carga el cache de país por autor generado por buscar_paises_autores.py."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "locales", "author_countries.json")
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+# Nombre de país (español) -> código ISO-3 para el mapa coroplético
+COUNTRY_ISO3 = {
+    "Estados Unidos": "USA", "Reino Unido": "GBR", "Francia": "FRA",
+    "Japón": "JPN", "Alemania": "DEU", "Rusia": "RUS", "China": "CHN",
+    "Argentina": "ARG", "España": "ESP", "Italia": "ITA", "Grecia": "GRC",
+    "Canadá": "CAN", "República Checa": "CZE", "Irlanda": "IRL",
+    "Polonia": "POL", "Brasil": "BRA", "México": "MEX", "Chile": "CHL",
+    "Colombia": "COL", "Perú": "PER", "Uruguay": "URY",
+    "Turquía": "TUR", "Portugal": "PRT", "Países Bajos": "NLD",
+    "Holanda": "NLD", "Bélgica": "BEL", "Suecia": "SWE", "Noruega": "NOR",
+    "Dinamarca": "DNK", "Finlandia": "FIN", "Suiza": "CHE", "Austria": "AUT",
+    "Hungría": "HUN", "Rumania": "ROU", "Ucrania": "UKR", "Israel": "ISR",
+    "India": "IND", "Corea del Sur": "KOR", "Australia": "AUS",
+    "Nueva Zelanda": "NZL", "Sudáfrica": "ZAF", "Egipto": "EGY",
+    "Cuba": "CUB", "Venezuela": "VEN", "Bolivia": "BOL", "Paraguay": "PRY",
+    "Ecuador": "ECU", "Nigeria": "NGA", "Marruecos": "MAR", "Croacia": "HRV",
+    "Serbia": "SRB", "Bulgaria": "BGR", "Islandia": "ISL", "Albania": "ALB",
+}
+
 # ── Configuración ─────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Goodreads Explorer",
@@ -145,6 +176,7 @@ GENRE_COLORS = {
 # ── Aliases de autores — agregar acá cualquier nombre duplicado ───────────────
 AUTHOR_ALIASES = {
     "Julio Verne": "Jules Verne",
+    "Juan Rousseau": "Jean-Jacques Rousseau",
 }
 
 # ── Carga y limpieza ──────────────────────────────────────────────────────────
@@ -165,8 +197,9 @@ def load_data(file):
     }
     df = df.rename(columns={k: v for k, v in col_map.items() if k in df.columns})
 
-    # Normalizar aliases de autores
+    # Normalizar espacios y aliases de autores
     if "author" in df.columns:
+        df["author"] = df["author"].astype(str).str.strip().str.replace(r"\s+", " ", regex=True)
         df["author"] = df["author"].replace(AUTHOR_ALIASES)
 
     # Fechas
@@ -666,6 +699,86 @@ with tab2:
         if pgs_label in auth_table.columns:
             auth_table[pgs_label] = auth_table[pgs_label].fillna(0).astype(int)
         st.dataframe(auth_table, use_container_width=True, height=320)
+
+    # ── Mapa mundial de autores ─────────────────────────────────────────────
+    author_countries = load_author_countries()
+
+    st.divider()
+    st.markdown(f'<div class="section-title">{t("authors_map_title")}</div>', unsafe_allow_html=True)
+
+    if not author_countries:
+        st.warning(
+            f"No se encontró o no se pudo leer `locales/author_countries.json`. "
+            f"Verificá que el archivo esté en la misma carpeta que `goodreads_explorer.py`, "
+            f"dentro de una subcarpeta llamada `locales`."
+        )
+    else:
+        st.caption(t("authors_map_hint"))
+
+        # Asignar país a cada libro vía el cache de autores
+        dff_geo = dff.copy()
+        dff_geo["author_country"] = dff_geo["author"].map(author_countries)
+        dff_geo = dff_geo.dropna(subset=["author_country"])
+
+        if dff_geo.empty:
+            st.info(t("authors_map_no_data"))
+        else:
+            country_label = t("authors_map_country_col")
+            country_cnt = (
+                dff_geo.groupby("author_country")["author"].nunique()
+                .reset_index().rename(columns={"author_country": country_label, "author": auth_label})
+            )
+            country_cnt["iso3"] = country_cnt[country_label].map(COUNTRY_ISO3)
+
+            missing_iso = country_cnt[country_cnt["iso3"].isna()][country_label].tolist()
+            country_cnt = country_cnt.dropna(subset=["iso3"])
+
+            if missing_iso:
+                st.caption(
+                    f"⚠️ País(es) sin código ISO asignado (no aparecen en el mapa): {', '.join(missing_iso)}. "
+                    f"Agregalos a COUNTRY_ISO3 en el código."
+                )
+
+            fig_map = px.choropleth(
+                country_cnt,
+                locations="iso3",
+                color=auth_label,
+                hover_name=country_label,
+                color_continuous_scale=["#dbe9f4", BLUE, "#382110"],
+            )
+            fig_map.update_layout(
+                **LAYOUT_BASE, height=480,
+                geo=dict(
+                    bgcolor="rgba(0,0,0,0)", showframe=False,
+                    landcolor="#ededed", coastlinecolor="#cccccc",
+                    showcountries=True, countrycolor="#b5b0a6", countrywidth=0.6,
+                ),
+            )
+            sel_map = st.plotly_chart(fig_map, use_container_width=True,
+                                      on_select="rerun", key="chart_author_map")
+
+            # Clic en un país -> mostrar autores y libros de ese país
+            try:
+                pts = sel_map.selection.get("points", [])
+                if pts:
+                    idx = pts[0].get("point_index", None)
+                    if idx is not None:
+                        country_val = country_cnt.iloc[idx][country_label]
+                        country_authors = sorted(
+                            dff_geo[dff_geo["author_country"] == country_val]["author"].unique()
+                        )
+                        st.markdown(
+                            f'<div class="section-title">📍 {country_val} — {", ".join(country_authors)}</div>',
+                            unsafe_allow_html=True,
+                        )
+                        show_books_table(dff_geo[dff_geo["author_country"] == country_val])
+            except Exception:
+                pass
+
+            unmatched = sorted(set(dff["author"].unique()) - set(author_countries.keys()))
+            if unmatched:
+                with st.expander(t("authors_map_unmatched")):
+                    st.write(", ".join(unmatched))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
