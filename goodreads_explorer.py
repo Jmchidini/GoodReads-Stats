@@ -361,6 +361,7 @@ with st.sidebar:
     st.markdown(f"### {t('sidebar_format_filters')}")
     exclude_manga = st.checkbox(t("exclude_manga"))
     exclude_light_novel = st.checkbox(t("exclude_light_novel"))
+    exclude_comics = st.checkbox(t("exclude_comics"))
 
 # Aplicar filtros
 mask = pd.Series([True] * len(df), index=df.index)
@@ -379,6 +380,8 @@ if exclude_manga:
     mask &= df["genre_list"].apply(lambda lst: "manga" not in lst)
 if exclude_light_novel:
     mask &= df["genre_list"].apply(lambda lst: "light-novel" not in lst)
+if exclude_comics:
+    mask &= df["genre_list"].apply(lambda lst: "comic" not in lst)
 
 dff = df[mask].copy()
 

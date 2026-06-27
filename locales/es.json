@@ -93,6 +93,7 @@
   "sidebar_format_filters": "🎌 Formato",
   "exclude_manga": "Excluir manga del conteo",
   "exclude_light_novel": "Excluir novelas ligeras del conteo",
+  "exclude_comics": "Excluir cómics del conteo",
   "authors_map_title": "🗺️ Mapa de autores por país",
   "authors_map_hint": "💡 Hacé clic en un país para ver los autores y libros de esa nacionalidad.",
   "authors_map_country_col": "País",
