@@ -177,6 +177,7 @@ GENRE_COLORS = {
 AUTHOR_ALIASES = {
     "Julio Verne": "Jules Verne",
     "Juan Rousseau": "Jean-Jacques Rousseau",
+    "Richard Bachman": "Stephen King",  # seudónimo de Stephen King
 }
 
 # ── Carga y limpieza ──────────────────────────────────────────────────────────
@@ -846,7 +847,7 @@ with tab3:
         st.markdown(f'<div class="section-title">{selected_label}</div>', unsafe_allow_html=True)
         show_books_table(filtered_books)
 
-    # Curva acumulada
+    # Curva acumulada — libros
     st.markdown(f'<div class="section-title">{t("history_cumulative")}</div>', unsafe_allow_html=True)
     cum = (
         dff.dropna(subset=["date_read"])
@@ -860,6 +861,18 @@ with tab3:
     fig_cum.update_traces(line_color=RED, line_width=2.5)
     fig_cum.update_layout(**LAYOUT_BASE, height=300)
     st.plotly_chart(fig_cum, use_container_width=True)
+
+    # Curva acumulada — páginas
+    if "pages" in cum.columns:
+        st.markdown(f'<div class="section-title">{t("history_cumulative_pages")}</div>', unsafe_allow_html=True)
+        cum_pg = cum.copy()
+        cum_pg[pgs_label] = cum_pg["pages"].fillna(0).cumsum().astype(int)
+        fig_cum_pg = px.line(cum_pg, x="date_read", y=pgs_label,
+                             labels={"date_read": t("col_date_read")},
+                             hover_data={"title": True} if "title" in cum_pg.columns else {})
+        fig_cum_pg.update_traces(line_color=GREEN, line_width=2.5)
+        fig_cum_pg.update_layout(**LAYOUT_BASE, height=300)
+        st.plotly_chart(fig_cum_pg, use_container_width=True)
 
     # Páginas por año
     if "pages" in dff.columns:

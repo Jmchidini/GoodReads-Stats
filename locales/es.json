@@ -63,6 +63,7 @@
   "history_books_year": "Libros leídos por año",
   "history_books_month": "Libros por mes (acumulado todos los años)",
   "history_cumulative": "Libros acumulados a lo largo del tiempo",
+  "history_cumulative_pages": "Páginas acumuladas a lo largo del tiempo",
   "history_pages_year": "Páginas leídas por año",
   "history_monthly_title": "Desglose mensual",
   "history_monthly_hint": "💡 Hacé clic en una barra para ver los libros de ese mes.",

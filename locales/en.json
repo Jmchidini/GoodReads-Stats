@@ -63,6 +63,7 @@
   "history_books_year": "Books read per year",
   "history_books_month": "Books per month (all years combined)",
   "history_cumulative": "Cumulative books over time",
+  "history_cumulative_pages": "Cumulative pages over time",
   "history_pages_year": "Pages read per year",
   "history_monthly_title": "Monthly breakdown",
   "history_monthly_hint": "💡 Click on a bar to see books from that month.",
