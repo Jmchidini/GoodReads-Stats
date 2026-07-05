@@ -61,6 +61,36 @@ COUNTRY_ISO3 = {
     "Serbia": "SRB", "Bulgaria": "BGR", "Islandia": "ISL", "Albania": "ALB",
 }
 
+# Traducción de nombres de país español → inglés
+COUNTRY_NAMES_EN = {
+    "Estados Unidos": "United States", "Reino Unido": "United Kingdom",
+    "Francia": "France", "Japón": "Japan", "Alemania": "Germany",
+    "Rusia": "Russia", "China": "China", "Argentina": "Argentina",
+    "España": "Spain", "Italia": "Italy", "Grecia": "Greece",
+    "Canadá": "Canada", "República Checa": "Czech Republic",
+    "Irlanda": "Ireland", "Polonia": "Poland", "Brasil": "Brazil",
+    "México": "Mexico", "Chile": "Chile", "Colombia": "Colombia",
+    "Perú": "Peru", "Uruguay": "Uruguay", "Turquía": "Turkey",
+    "Portugal": "Portugal", "Países Bajos": "Netherlands",
+    "Holanda": "Netherlands", "Bélgica": "Belgium", "Suecia": "Sweden",
+    "Noruega": "Norway", "Dinamarca": "Denmark", "Finlandia": "Finland",
+    "Suiza": "Switzerland", "Austria": "Austria", "Hungría": "Hungary",
+    "Rumania": "Romania", "Ucrania": "Ukraine", "Israel": "Israel",
+    "India": "India", "Corea del Sur": "South Korea", "Australia": "Australia",
+    "Nueva Zelanda": "New Zealand", "Sudáfrica": "South Africa",
+    "Egipto": "Egypt", "Cuba": "Cuba", "Venezuela": "Venezuela",
+    "Bolivia": "Bolivia", "Paraguay": "Paraguay", "Ecuador": "Ecuador",
+    "Nigeria": "Nigeria", "Marruecos": "Morocco", "Croacia": "Croatia",
+    "Serbia": "Serbia", "Bulgaria": "Bulgaria", "Islandia": "Iceland",
+    "Albania": "Albania",
+}
+
+def translate_country(name_es: str) -> str:
+    """Devuelve el nombre del país en el idioma activo."""
+    if st.session_state.get("lang_selector") == "English":
+        return COUNTRY_NAMES_EN.get(name_es, name_es)
+    return name_es
+
 # ── Configuración ─────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Goodreads Explorer",
@@ -728,11 +758,18 @@ with tab2:
             st.info(t("authors_map_no_data"))
         else:
             country_label = t("authors_map_country_col")
+
+            # Traducir nombres de país al idioma activo
+            dff_geo["author_country_display"] = dff_geo["author_country"].apply(translate_country)
+
             country_cnt = (
-                dff_geo.groupby("author_country")["author"].nunique()
-                .reset_index().rename(columns={"author_country": country_label, "author": auth_label})
+                dff_geo.groupby("author_country_display")["author"].nunique()
+                .reset_index().rename(columns={"author_country_display": country_label, "author": auth_label})
             )
-            country_cnt["iso3"] = country_cnt[country_label].map(COUNTRY_ISO3)
+            # ISO3 sigue basado en el nombre en español (fuente de verdad)
+            country_cnt["iso3"] = country_cnt[country_label].map(
+                {translate_country(k): v for k, v in COUNTRY_ISO3.items()}
+            )
 
             missing_iso = country_cnt[country_cnt["iso3"].isna()][country_label].tolist()
             country_cnt = country_cnt.dropna(subset=["iso3"])
@@ -767,15 +804,16 @@ with tab2:
                 if pts:
                     idx = pts[0].get("point_index", None)
                     if idx is not None:
-                        country_val = country_cnt.iloc[idx][country_label]
+                        country_display = country_cnt.iloc[idx][country_label]
+                        # Buscar en español para filtrar dff_geo
                         country_authors = sorted(
-                            dff_geo[dff_geo["author_country"] == country_val]["author"].unique()
+                            dff_geo[dff_geo["author_country_display"] == country_display]["author"].unique()
                         )
                         st.markdown(
-                            f'<div class="section-title">📍 {country_val} — {", ".join(country_authors)}</div>',
+                            f'<div class="section-title">📍 {country_display} — {", ".join(country_authors)}</div>',
                             unsafe_allow_html=True,
                         )
-                        show_books_table(dff_geo[dff_geo["author_country"] == country_val])
+                        show_books_table(dff_geo[dff_geo["author_country_display"] == country_display])
             except Exception:
                 pass
 
