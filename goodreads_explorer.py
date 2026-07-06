@@ -762,41 +762,72 @@ with tab2:
             # Traducir nombres de país al idioma activo
             dff_geo["author_country_display"] = dff_geo["author_country"].apply(translate_country)
 
-            country_cnt = (
-                dff_geo.groupby("author_country_display")["author"].nunique()
-                .reset_index().rename(columns={"author_country_display": country_label, "author": auth_label})
-            )
-            # ISO3 sigue basado en el nombre en español (fuente de verdad)
-            country_cnt["iso3"] = country_cnt[country_label].map(
-                {translate_country(k): v for k, v in COUNTRY_ISO3.items()}
-            )
+            iso3_map = {translate_country(k): v for k, v in COUNTRY_ISO3.items()}
 
-            missing_iso = country_cnt[country_cnt["iso3"].isna()][country_label].tolist()
-            country_cnt = country_cnt.dropna(subset=["iso3"])
+            def build_country_df(agg_col, agg_func, label):
+                """Construye el dataframe de países con ISO3 para el mapa."""
+                if agg_func == "nunique":
+                    cnt = (
+                        dff_geo.groupby("author_country_display")[agg_col].nunique()
+                        .reset_index().rename(columns={"author_country_display": country_label, agg_col: label})
+                    )
+                else:
+                    cnt = (
+                        dff_geo.groupby("author_country_display")[agg_col].sum()
+                        .reset_index().rename(columns={"author_country_display": country_label, agg_col: label})
+                    )
+                cnt["iso3"] = cnt[country_label].map(iso3_map)
+                return cnt
 
+            country_authors_df = build_country_df("author", "nunique", auth_label)
+            country_books_df   = build_country_df("title",  "count",   bks_label)
+            country_pages_df   = build_country_df("pages",  "sum",     pgs_label)
+
+            # Avisar países sin ISO3 (usando el df de autores como referencia)
+            missing_iso = country_authors_df[country_authors_df["iso3"].isna()][country_label].tolist()
             if missing_iso:
                 st.caption(
                     f"⚠️ País(es) sin código ISO asignado (no aparecen en el mapa): {', '.join(missing_iso)}. "
                     f"Agregalos a COUNTRY_ISO3 en el código."
                 )
 
-            fig_map = px.choropleth(
-                country_cnt,
-                locations="iso3",
-                color=auth_label,
-                hover_name=country_label,
-                color_continuous_scale=["#dbe9f4", BLUE, "#382110"],
-            )
-            fig_map.update_layout(
-                **LAYOUT_BASE, height=480,
-                geo=dict(
-                    bgcolor="rgba(0,0,0,0)", showframe=False,
-                    landcolor="#ededed", coastlinecolor="#cccccc",
-                    showcountries=True, countrycolor="#b5b0a6", countrywidth=0.6,
-                ),
-            )
-            sel_map = st.plotly_chart(fig_map, use_container_width=True,
-                                      on_select="rerun", key="chart_author_map")
+            country_authors_df = country_authors_df.dropna(subset=["iso3"])
+            country_books_df   = country_books_df.dropna(subset=["iso3"])
+            country_pages_df   = country_pages_df.dropna(subset=["iso3"])
+
+            def make_choropleth(df, color_col, key):
+                fig = px.choropleth(
+                    df, locations="iso3", color=color_col, hover_name=country_label,
+                    color_continuous_scale=["#dbe9f4", BLUE, "#382110"],
+                )
+                fig.update_layout(
+                    **LAYOUT_BASE, height=480,
+                    geo=dict(
+                        bgcolor="rgba(0,0,0,0)", showframe=False,
+                        landcolor="#ededed", coastlinecolor="#cccccc",
+                        showcountries=True, countrycolor="#b5b0a6", countrywidth=0.6,
+                    ),
+                )
+                return st.plotly_chart(fig, use_container_width=True,
+                                       on_select="rerun", key=key)
+
+            map_tab1, map_tab2, map_tab3 = st.tabs([
+                f"👤 {t('metric_authors')}",
+                f"📚 {t('metric_books')}",
+                f"📄 {t('metric_pages')}",
+            ])
+
+            with map_tab1:
+                sel_map = make_choropleth(country_authors_df, auth_label, "chart_author_map")
+                active_df = country_authors_df
+
+            with map_tab2:
+                sel_map = make_choropleth(country_books_df, bks_label, "chart_books_map")
+                active_df = country_books_df
+
+            with map_tab3:
+                sel_map = make_choropleth(country_pages_df, pgs_label, "chart_pages_map")
+                active_df = country_pages_df
 
             # Clic en un país -> mostrar autores y libros de ese país
             try:
@@ -804,8 +835,7 @@ with tab2:
                 if pts:
                     idx = pts[0].get("point_index", None)
                     if idx is not None:
-                        country_display = country_cnt.iloc[idx][country_label]
-                        # Buscar en español para filtrar dff_geo
+                        country_display = active_df.iloc[idx][country_label]
                         country_authors = sorted(
                             dff_geo[dff_geo["author_country_display"] == country_display]["author"].unique()
                         )
