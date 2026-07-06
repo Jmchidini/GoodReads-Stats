@@ -840,34 +840,41 @@ with tab2:
             ])
 
             with map_tab1:
-                sel_map = make_choropleth(country_authors_df, auth_label, "chart_author_map")
-                active_df = country_authors_df
+                sel_map1 = make_choropleth(country_authors_df, auth_label, "chart_author_map")
 
             with map_tab2:
-                sel_map = make_choropleth(country_books_df, bks_label, "chart_books_map")
-                active_df = country_books_df
+                sel_map2 = make_choropleth(country_books_df, bks_label, "chart_books_map")
 
             with map_tab3:
-                sel_map = make_choropleth(country_pages_df, pgs_label, "chart_pages_map")
-                active_df = country_pages_df
+                sel_map3 = make_choropleth(country_pages_df, pgs_label, "chart_pages_map")
 
             # Clic en un país -> mostrar autores y libros de ese país
-            try:
-                pts = sel_map.selection.get("points", [])
-                if pts:
-                    idx = pts[0].get("point_index", None)
-                    if idx is not None:
-                        country_display = active_df.iloc[idx][country_label]
-                        country_authors = sorted(
-                            dff_geo[dff_geo["author_country_display"] == country_display]["author"].unique()
-                        )
-                        st.markdown(
-                            f'<div class="section-title">📍 {country_display} — {", ".join(country_authors)}</div>',
-                            unsafe_allow_html=True,
-                        )
-                        show_books_table(dff_geo[dff_geo["author_country_display"] == country_display])
-            except Exception:
-                pass
+            # Revisamos los tres tabs y usamos el que tenga un punto seleccionado
+            country_display = None
+            for sel_map, active_df in [
+                (sel_map1, country_authors_df),
+                (sel_map2, country_books_df),
+                (sel_map3, country_pages_df),
+            ]:
+                try:
+                    pts = sel_map.selection.get("points", [])
+                    if pts:
+                        idx = pts[0].get("point_index", None)
+                        if idx is not None:
+                            country_display = active_df.iloc[idx][country_label]
+                            break
+                except Exception:
+                    pass
+
+            if country_display:
+                country_authors = sorted(
+                    dff_geo[dff_geo["author_country_display"] == country_display]["author"].unique()
+                )
+                st.markdown(
+                    f'<div class="section-title">📍 {country_display} — {", ".join(country_authors)}</div>',
+                    unsafe_allow_html=True,
+                )
+                show_books_table(dff_geo[dff_geo["author_country_display"] == country_display])
 
             unmatched = sorted(set(dff["author"].unique()) - set(author_countries.keys()))
             if unmatched:
