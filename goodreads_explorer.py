@@ -780,8 +780,15 @@ with tab2:
                 return cnt
 
             country_authors_df = build_country_df("author", "nunique", auth_label)
-            country_books_df   = build_country_df("title",  "count",   bks_label)
             country_pages_df   = build_country_df("pages",  "sum",     pgs_label)
+
+            # Libros: contar filas por país directamente
+            country_books_df = (
+                dff_geo.groupby("author_country_display").size()
+                .reset_index(name=bks_label)
+                .rename(columns={"author_country_display": country_label})
+            )
+            country_books_df["iso3"] = country_books_df[country_label].map(iso3_map)
 
             # Avisar países sin ISO3 (usando el df de autores como referencia)
             missing_iso = country_authors_df[country_authors_df["iso3"].isna()][country_label].tolist()
