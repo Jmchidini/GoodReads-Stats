@@ -291,27 +291,36 @@ def add_goodreads_links(df_display):
     """Agrega columna de links HTML a un dataframe para mostrar en st.markdown."""
     return df_display
 
-def show_books_table(df_src, sort_col="date_read", height=320):
-    """Muestra tabla de libros con link a Goodreads."""
+def show_books_table(df_src, sort_col="date_read", height=400):
+    """Muestra tabla de libros ordenable con link a Goodreads."""
     cols_show = [c for c in ["title","author","pub_year","date_read","my_rating","pages"] if c in df_src.columns]
     tbl = df_src[cols_show].copy()
-    tbl["🔗"] = df_src.apply(lambda r: f'<a href="{goodreads_url(r)}" target="_blank">Goodreads</a>', axis=1)
-    tbl = tbl.rename(columns={
-        "title":     t("col_title"),
-        "author":    t("col_author"),
-        "pub_year":  t("col_pub_year"),
-        "date_read": t("col_date_read"),
-        "my_rating": t("col_rating"),
-        "pages":     t("col_pages"),
-    })
-    date_col = t("col_date_read")
-    pub_col  = t("col_pub_year")
+    tbl["goodreads_url"] = df_src.apply(lambda r: goodreads_url(r), axis=1)
+
+    # Formatear fechas y años antes de mostrar
+    date_col = "date_read"
     if date_col in tbl.columns:
         tbl = tbl.sort_values(date_col, ascending=False)
-        tbl[date_col] = tbl[date_col].dt.strftime(t("date_format"))
+
+    pub_col = "pub_year"
     if pub_col in tbl.columns:
         tbl[pub_col] = tbl[pub_col].fillna(0).astype(int)
-    st.write(tbl.to_html(escape=False, index=False), unsafe_allow_html=True)
+
+    st.dataframe(
+        tbl,
+        use_container_width=True,
+        hide_index=True,
+        height=height,
+        column_config={
+            "title":        st.column_config.TextColumn(t("col_title")),
+            "author":       st.column_config.TextColumn(t("col_author")),
+            "pub_year":     st.column_config.NumberColumn(t("col_pub_year"), format="%d"),
+            "date_read":    st.column_config.DateColumn(t("col_date_read"), format="MMM YYYY"),
+            "my_rating":    st.column_config.NumberColumn(t("col_rating"), format="%d ⭐"),
+            "pages":        st.column_config.NumberColumn(t("col_pages"), format="%d"),
+            "goodreads_url": st.column_config.LinkColumn("🔗", display_text="Goodreads"),
+        },
+    )
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -610,19 +619,25 @@ with tab1:
     with st.expander(t("scatter_table_expander")):
         cols_show = [c for c in ["title","author","pub_year","date_read","my_rating","pages","primary_genre"] if c in dff.columns]
         show_df = dff[cols_show].copy()
-        show_df["goodreads"] = dff.apply(lambda r: f'<a href="{goodreads_url(r)}" target="_blank">🔗</a>', axis=1)
-        show_df = show_df.rename(columns={
-            "title": t("col_title"), "author": t("col_author"), "pub_year": t("col_pub_year"),
-            "date_read": t("col_date_read"), "my_rating": t("col_rating"), "pages": t("col_pages"),
-            "primary_genre": t("col_genre"), "goodreads": t("col_goodreads"),
-        }).sort_values(t("col_date_read"), ascending=False)
-        date_col = t("col_date_read")
-        if date_col in show_df.columns:
-            show_df[date_col] = show_df[date_col].dt.strftime(t("date_format"))
-        pub_col = t("col_pub_year")
-        if pub_col in show_df.columns:
-            show_df[pub_col] = show_df[pub_col].fillna(0).astype(int)
-        st.write(show_df.to_html(escape=False, index=False), unsafe_allow_html=True)
+        show_df["goodreads_url"] = dff.apply(lambda r: goodreads_url(r), axis=1)
+        show_df = show_df.sort_values("date_read", ascending=False)
+        show_df["pub_year"] = show_df["pub_year"].fillna(0).astype(int)
+        st.dataframe(
+            show_df,
+            use_container_width=True,
+            hide_index=True,
+            height=350,
+            column_config={
+                "title":         st.column_config.TextColumn(t("col_title")),
+                "author":        st.column_config.TextColumn(t("col_author")),
+                "pub_year":      st.column_config.NumberColumn(t("col_pub_year"), format="%d"),
+                "date_read":     st.column_config.DateColumn(t("col_date_read"), format="MMM YYYY"),
+                "my_rating":     st.column_config.NumberColumn(t("col_rating"), format="%d ⭐"),
+                "pages":         st.column_config.NumberColumn(t("col_pages"), format="%d"),
+                "primary_genre": st.column_config.TextColumn(t("col_genre")),
+                "goodreads_url": st.column_config.LinkColumn("🔗", display_text="Goodreads"),
+            },
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
