@@ -721,7 +721,9 @@ with tab2:
     with col_c2:
         st.markdown(f'<div class="section-title">{t("authors_by_rating")}</div>', unsafe_allow_html=True)
         fig_b = px.bar(auth_rat, x=rat_label, y=auth_label, orientation="h",
-                       color=rat_label, color_continuous_scale=["#e94560", "#f5a623", "#53c28b"],
+                       color=rat_label,
+                       color_continuous_scale=["#e94560", "#f5a623", "#53c28b"],
+                       range_color=[0, 5],
                        range_x=[0, 5.3], hover_data={bks_label: True})
         fig_b.update_layout(**LAYOUT_BASE, height=chart_h,
                             yaxis=dict(autorange="reversed"), coloraxis_showscale=False)
