@@ -525,6 +525,25 @@ with tab1:
             hovertemplate="%{text}<extra></extra>",
         ))
 
+    # Trace para libros sin ningún género asignado
+    no_genre_df = scatter_df[scatter_df["genre_list"].apply(lambda lst: len(lst) == 0)]
+    if not no_genre_df.empty:
+        no_genre_label = t("no_genre_label")
+        fig.add_trace(go.Scatter(
+            x=no_genre_df["read_float"],
+            y=no_genre_df["pub_year"],
+            mode="markers",
+            name=no_genre_label,
+            marker=dict(
+                size=10,
+                color="#cccccc",
+                opacity=0.7,
+                line=dict(width=0.8, color="white"),
+            ),
+            text=no_genre_df["hover"],
+            hovertemplate="%{text}<extra></extra>",
+        ))
+
     fig.update_layout(
         **LAYOUT_BASE,
         height=620,

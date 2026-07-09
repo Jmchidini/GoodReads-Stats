@@ -87,6 +87,7 @@
   "months": ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
   "rating_format": "⭐ ({n})",
   "no_rating": "No rating",
+  "no_genre_label": "Uncategorized",
   "date_format": "%b %Y",
   "date_format_long": "%d %b %Y",
   "language_selector": "Idioma / Language",
