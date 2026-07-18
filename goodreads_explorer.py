@@ -823,11 +823,11 @@ with tab2:
             dff_gen.groupby("gender_label").size()
             .reset_index(name=bks_label)
         )
+        books_by_gender["_color"] = books_by_gender["gender_label"].map(GENDER_COLORS_MAP)
         fig_gb = px.bar(books_by_gender, x="gender_label", y=bks_label,
-                        color="gender_label", color_discrete_map=GENDER_COLORS_MAP,
                         labels={"gender_label": gender_col})
-        fig_gb.update_layout(**LAYOUT_BASE, height=300, showlegend=False,
-                             xaxis_title=None)
+        fig_gb.update_traces(marker_color=books_by_gender["_color"])
+        fig_gb.update_layout(**LAYOUT_BASE, height=300, showlegend=False, xaxis_title=None)
         with g_col1:
             st.markdown(f"**{t('metric_books')}**")
             sel_gb = st.plotly_chart(fig_gb, use_container_width=True,
@@ -838,11 +838,11 @@ with tab2:
             dff_gen.groupby("gender_label")["pages"].sum()
             .reset_index(name=pgs_label)
         )
+        pages_by_gender["_color"] = pages_by_gender["gender_label"].map(GENDER_COLORS_MAP)
         fig_gp = px.bar(pages_by_gender, x="gender_label", y=pgs_label,
-                        color="gender_label", color_discrete_map=GENDER_COLORS_MAP,
                         labels={"gender_label": gender_col})
-        fig_gp.update_layout(**LAYOUT_BASE, height=300, showlegend=False,
-                             xaxis_title=None)
+        fig_gp.update_traces(marker_color=pages_by_gender["_color"])
+        fig_gp.update_layout(**LAYOUT_BASE, height=300, showlegend=False, xaxis_title=None)
         with g_col2:
             st.markdown(f"**{t('metric_pages')}**")
             sel_gp = st.plotly_chart(fig_gp, use_container_width=True,
@@ -853,11 +853,11 @@ with tab2:
             dff_gen.groupby("gender_label")["author"].nunique()
             .reset_index(name=auth_label)
         )
+        authors_by_gender["_color"] = authors_by_gender["gender_label"].map(GENDER_COLORS_MAP)
         fig_ga = px.bar(authors_by_gender, x="gender_label", y=auth_label,
-                        color="gender_label", color_discrete_map=GENDER_COLORS_MAP,
                         labels={"gender_label": gender_col})
-        fig_ga.update_layout(**LAYOUT_BASE, height=300, showlegend=False,
-                             xaxis_title=None)
+        fig_ga.update_traces(marker_color=authors_by_gender["_color"])
+        fig_ga.update_layout(**LAYOUT_BASE, height=300, showlegend=False, xaxis_title=None)
         with g_col3:
             st.markdown(f"**{t('metric_authors')}**")
             sel_ga = st.plotly_chart(fig_ga, use_container_width=True,
