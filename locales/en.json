@@ -100,5 +100,12 @@
   "authors_map_hint": "💡 Click on a country to see authors and books from that nationality.",
   "authors_map_country_col": "Country",
   "authors_map_no_data": "No country data available. Run buscar_paises_autores.py first.",
-  "authors_map_unmatched": "⚠️ Authors without an assigned country yet"
+  "authors_map_unmatched": "⚠️ Authors without an assigned country yet",
+  "authors_gender_title": "📊 Statistics by author gender",
+  "authors_gender_hint": "💡 Click on a bar to see the books from that group.",
+  "gender_H": "Male",
+  "gender_M": "Female",
+  "gender_O": "Other",
+  "gender_col": "Author gender",
+  "gender_no_data": "No gender data available. Run buscar_genero_autores.py first."
 }

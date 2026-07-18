@@ -31,7 +31,18 @@ def t(key: str) -> str:
     return st.session_state.get("locale", {}).get(key, key)
 
 @st.cache_data
-def load_author_countries() -> dict:
+def load_author_genders() -> dict:
+    """Carga el cache de género por autor generado por buscar_genero_autores.py."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "locales", "author_genders.json")
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
     """Carga el cache de país por autor generado por buscar_paises_autores.py."""
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "locales", "author_countries.json")
     if not os.path.exists(path):
@@ -769,6 +780,105 @@ with tab2:
         if pgs_label in auth_table.columns:
             auth_table[pgs_label] = auth_table[pgs_label].fillna(0).astype(int)
         st.dataframe(auth_table, use_container_width=True, height=320)
+
+    # ── Estadísticas por género del autor ───────────────────────────────────
+    author_genders = load_author_genders()
+
+    st.divider()
+    st.markdown(f'<div class="section-title">{t("authors_gender_title")}</div>', unsafe_allow_html=True)
+
+    if not author_genders:
+        st.warning(t("gender_no_data"))
+    else:
+        st.caption(t("authors_gender_hint"))
+
+        GENDER_LABELS = {"H": t("gender_H"), "M": t("gender_M"), "O": t("gender_O")}
+        GENDER_COLORS_MAP = {
+            t("gender_H"): "#0f3460",
+            t("gender_M"): "#e94560",
+            t("gender_O"): "#f5a623",
+        }
+
+        dff_gen = dff.copy()
+        dff_gen["author_gender"] = dff_gen["author"].map(author_genders)
+        dff_gen["gender_label"]  = dff_gen["author_gender"].map(GENDER_LABELS).fillna(t("gender_O"))
+
+        gender_col = t("gender_col")
+        g_col1, g_col2, g_col3 = st.columns(3)
+
+        # Libros por género
+        books_by_gender = (
+            dff_gen.groupby("gender_label").size()
+            .reset_index(name=bks_label)
+        )
+        fig_gb = px.bar(books_by_gender, x="gender_label", y=bks_label,
+                        color="gender_label", color_discrete_map=GENDER_COLORS_MAP,
+                        labels={"gender_label": gender_col})
+        fig_gb.update_layout(**LAYOUT_BASE, height=300, showlegend=False,
+                             xaxis_title=None)
+        with g_col1:
+            st.markdown(f"**{t('metric_books')}**")
+            sel_gb = st.plotly_chart(fig_gb, use_container_width=True,
+                                     on_select="rerun", key="chart_gender_books")
+
+        # Páginas por género
+        pages_by_gender = (
+            dff_gen.groupby("gender_label")["pages"].sum()
+            .reset_index(name=pgs_label)
+        )
+        fig_gp = px.bar(pages_by_gender, x="gender_label", y=pgs_label,
+                        color="gender_label", color_discrete_map=GENDER_COLORS_MAP,
+                        labels={"gender_label": gender_col})
+        fig_gp.update_layout(**LAYOUT_BASE, height=300, showlegend=False,
+                             xaxis_title=None)
+        with g_col2:
+            st.markdown(f"**{t('metric_pages')}**")
+            sel_gp = st.plotly_chart(fig_gp, use_container_width=True,
+                                     on_select="rerun", key="chart_gender_pages")
+
+        # Autores únicos por género
+        authors_by_gender = (
+            dff_gen.groupby("gender_label")["author"].nunique()
+            .reset_index(name=auth_label)
+        )
+        fig_ga = px.bar(authors_by_gender, x="gender_label", y=auth_label,
+                        color="gender_label", color_discrete_map=GENDER_COLORS_MAP,
+                        labels={"gender_label": gender_col})
+        fig_ga.update_layout(**LAYOUT_BASE, height=300, showlegend=False,
+                             xaxis_title=None)
+        with g_col3:
+            st.markdown(f"**{t('metric_authors')}**")
+            sel_ga = st.plotly_chart(fig_ga, use_container_width=True,
+                                     on_select="rerun", key="chart_gender_authors")
+
+        # Clic en barra → tabla de libros de ese grupo
+        selected_gender = None
+        for sel_g, df_ref_g in [
+            (sel_gb, books_by_gender),
+            (sel_gp, pages_by_gender),
+            (sel_ga, authors_by_gender),
+        ]:
+            try:
+                pts = sel_g.selection.get("points", [])
+                if pts:
+                    idx = pts[0].get("point_index", None)
+                    if idx is not None:
+                        selected_gender = df_ref_g.iloc[idx]["gender_label"]
+                        break
+            except Exception:
+                pass
+
+        if selected_gender:
+            st.markdown(
+                f'<div class="section-title">👤 {selected_gender}</div>',
+                unsafe_allow_html=True,
+            )
+            show_books_table(dff_gen[dff_gen["gender_label"] == selected_gender])
+
+        unmatched_g = sorted(set(dff["author"].unique()) - set(author_genders.keys()))
+        if unmatched_g:
+            with st.expander(f"⚠️ {len(unmatched_g)} autores sin género asignado"):
+                st.write(", ".join(unmatched_g))
 
     # ── Mapa mundial de autores ─────────────────────────────────────────────
     author_countries = load_author_countries()
