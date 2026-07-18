@@ -42,6 +42,18 @@ def load_author_genders() -> dict:
     except Exception:
         return {}
 
+@st.cache_data
+def load_author_countries() -> dict:
+    """Carga el cache de país por autor generado por buscar_paises_autores.py."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "locales", "author_countries.json")
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
 
     """Carga el cache de país por autor generado por buscar_paises_autores.py."""
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "locales", "author_countries.json")
