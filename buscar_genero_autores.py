@@ -204,13 +204,15 @@ def main():
     new_lookups = 0
 
     for author in authors:
-        if author in cache:
+        # Overrides manuales tienen SIEMPRE prioridad, incluso sobre valores null en cache
+        if author in MANUAL_OVERRIDES:
+            if cache.get(author) != MANUAL_OVERRIDES[author]:
+                cache[author] = MANUAL_OVERRIDES[author]
+                print(f"[override] {author} -> {MANUAL_OVERRIDES[author]}")
             continue
 
-        if author in MANUAL_OVERRIDES:
-            cache[author] = MANUAL_OVERRIDES[author]
-            print(f"[override] {author} -> {MANUAL_OVERRIDES[author]}")
-            continue
+        if author in cache and cache[author] is not None:
+            continue  # ya tiene un valor válido en cache, no tocar
 
         # Buscar en Wikidata
         gender = wikidata_gender(author)
