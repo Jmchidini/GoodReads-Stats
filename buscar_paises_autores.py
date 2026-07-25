@@ -100,6 +100,11 @@ MANUAL_OVERRIDES = {
     "David Grann": "Estados Unidos",
     "J.D. Vance": "Estados Unidos",
     "Matt Groening": "Estados Unidos",
+    "Adolfo Bioy Casares": "Argentina",
+    "Horacio Quiroga": "Uruguay",
+    "Casona A.": "España",       # Alejandro Casona
+    "Gonzalez": "Argentina",
+    "MARRADI": "Argentina",
     "Jeff Vandermeer": "Estados Unidos",
 }
 
