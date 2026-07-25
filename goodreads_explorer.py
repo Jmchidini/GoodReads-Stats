@@ -431,7 +431,7 @@ mask = pd.Series([True] * len(df), index=df.index)
 if yr_range:
     mask &= df["read_year"].between(*yr_range) | df["read_year"].isna()
 if pub_range:
-    mask &= df["pub_year"].fillna(9999).between(*pub_range)
+    mask &= df["pub_year"].between(*pub_range) | df["pub_year"].isna()
 if genres_sel and len(genres_sel) < len(all_genres_with_none):
     include_none = "sin categoría" in genres_sel
     mask &= df["genre_list"].apply(
