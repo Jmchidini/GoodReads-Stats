@@ -77,7 +77,7 @@ MANUAL_OVERRIDES = {
     "H.P. Lovecraft": "Estados Unidos",
     "Herman Melville": "Estados Unidos",
     "Homer": "Grecia",
-    "Isaac Asimov": "Estados Unidos",
+    "Isaac Asimov": "Rusia",     # nació en Petróvichi, Rusia (1920), aunque se nacionalizó estadounidense
     "Joe Haldeman": "Estados Unidos",
     "John Locke": "Reino Unido",
     "Karl Marx": "Alemania",
