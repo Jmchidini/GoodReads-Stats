@@ -110,6 +110,8 @@ MANUAL_OVERRIDES = {
     "Tim Bowler": "H",
     "Logan Ryan Smith": "H",
     "Abraham Matthews": "H",
+    "Dr. Sherneatha G Youngblood": "M",
+    "Ursula K. Le Guin": "M",
 }
 
 WIKIDATA_API = "https://www.wikidata.org/w/api.php"

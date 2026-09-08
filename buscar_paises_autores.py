@@ -105,6 +105,8 @@ MANUAL_OVERRIDES = {
     "Casona A.": "España",       # Alejandro Casona
     "Gonzalez": "Argentina",
     "MARRADI": "Argentina",
+    "Dr. Sherneatha G Youngblood": "Estados Unidos",
+    "Ursula K. Le Guin": "Estados Unidos",
     "Jeff Vandermeer": "Estados Unidos",
 }
 
@@ -150,32 +152,141 @@ def fetch_wikipedia_summary(author: str, lang_api: str) -> str | None:
 
 
 def guess_country(extract: str) -> str | None:
-    """Heurística simple para extraer el país desde el texto del resumen."""
+    """
+    Heurística mejorada para extraer el país desde el texto del resumen de Wikipedia.
+    Cubre:
+    - Adjetivos de nacionalidad (argentino/a, uruguayo/a, etc.)
+    - Patrones de nacimiento: "nació en [Ciudad], [País]" / "([Ciudad], [año]"
+    - Ciudades capitales y ciudades conocidas → país
+    - Variantes en inglés y español
+    """
     if not extract:
         return None
-    # Nacionalidades comunes -> país (extensible)
-    NATIONALITY_MAP = {
-        "estadounidense": "Estados Unidos", "american": "Estados Unidos",
-        "británico": "Reino Unido", "británica": "Reino Unido", "british": "Reino Unido",
-        "inglés": "Reino Unido", "inglesa": "Reino Unido", "english": "Reino Unido",
-        "francés": "Francia", "francesa": "Francia", "french": "Francia",
-        "japonés": "Japón", "japonesa": "Japón", "japanese": "Japón",
-        "alemán": "Alemania", "alemana": "Alemania", "german": "Alemania",
-        "ruso": "Rusia", "rusa": "Rusia", "russian": "Rusia",
-        "chino": "China", "china": "China", "chinese": "China",
-        "argentino": "Argentina", "argentina": "Argentina",
-        "español": "España", "española": "España", "spanish": "España",
-        "italiano": "Italia", "italiana": "Italia", "italian": "Italia",
-        "griego": "Grecia", "griega": "Grecia", "greek": "Grecia",
-        "canadiense": "Canadá", "canadian": "Canadá",
-        "checo": "República Checa", "czech": "República Checa",
-        "irlandés": "Irlanda", "irish": "Irlanda",
-        "polaco": "Polonia", "polish": "Polonia",
-    }
+
     lower = extract.lower()
+
+    # ── 1. Adjetivos de nacionalidad ─────────────────────────────────────────
+    NATIONALITY_MAP = {
+        # América del Sur
+        "argentino": "Argentina",    "argentina": "Argentina",
+        "uruguayo": "Uruguay",       "uruguaya": "Uruguay",
+        "chileno": "Chile",          "chilena": "Chile",
+        "colombiano": "Colombia",    "colombiana": "Colombia",
+        "peruano": "Perú",           "peruana": "Perú",
+        "venezolano": "Venezuela",   "venezolana": "Venezuela",
+        "boliviano": "Bolivia",      "boliviana": "Bolivia",
+        "paraguayo": "Paraguay",     "paraguaya": "Paraguay",
+        "ecuatoriano": "Ecuador",    "ecuatoriana": "Ecuador",
+        "brasileño": "Brasil",       "brasileña": "Brasil",
+        "brazilian": "Brasil",
+        # América del Norte y Central
+        "estadounidense": "Estados Unidos", "american": "Estados Unidos",
+        "mexicano": "México",        "mexicana": "México", "mexican": "México",
+        "cubano": "Cuba",            "cubana": "Cuba",
+        "canadiense": "Canadá",      "canadian": "Canadá",
+        # Europa
+        "británico": "Reino Unido",  "británica": "Reino Unido", "british": "Reino Unido",
+        "inglés": "Reino Unido",     "inglesa": "Reino Unido",   "english": "Reino Unido",
+        "escocés": "Reino Unido",    "escocesa": "Reino Unido",
+        "irlandés": "Irlanda",       "irlandesa": "Irlanda",     "irish": "Irlanda",
+        "francés": "Francia",        "francesa": "Francia",      "french": "Francia",
+        "alemán": "Alemania",        "alemana": "Alemania",      "german": "Alemania",
+        "español": "España",         "española": "España",       "spanish": "España",
+        "italiano": "Italia",        "italiana": "Italia",       "italian": "Italia",
+        "portugués": "Portugal",     "portuguesa": "Portugal",   "portuguese": "Portugal",
+        "ruso": "Rusia",             "rusa": "Rusia",            "russian": "Rusia",
+        "polaco": "Polonia",         "polaca": "Polonia",        "polish": "Polonia",
+        "checo": "República Checa",  "checa": "República Checa", "czech": "República Checa",
+        "húngaro": "Hungría",        "húngara": "Hungría",
+        "rumano": "Rumania",         "rumana": "Rumania",
+        "sueco": "Suecia",           "sueca": "Suecia",          "swedish": "Suecia",
+        "noruego": "Noruega",        "noruega": "Noruega",       "norwegian": "Noruega",
+        "danés": "Dinamarca",        "danesa": "Dinamarca",      "danish": "Dinamarca",
+        "finlandés": "Finlandia",    "finlandesa": "Finlandia",
+        "suizo": "Suiza",            "suiza": "Suiza",           "swiss": "Suiza",
+        "austríaco": "Austria",      "austríaca": "Austria",     "austrian": "Austria",
+        "belga": "Bélgica",                                      "belgian": "Bélgica",
+        "holandés": "Países Bajos",  "holandesa": "Países Bajos","dutch": "Países Bajos",
+        "griego": "Grecia",          "griega": "Grecia",         "greek": "Grecia",
+        "turco": "Turquía",          "turca": "Turquía",         "turkish": "Turquía",
+        "israelí": "Israel",                                     "israeli": "Israel",
+        "ucraniano": "Ucrania",      "ucraniana": "Ucrania",
+        # Asia
+        "japonés": "Japón",          "japonesa": "Japón",        "japanese": "Japón",
+        "chino": "China",            "china": "China",           "chinese": "China",
+        "coreano": "Corea del Sur",  "coreana": "Corea del Sur", "korean": "Corea del Sur",
+        "indio": "India",            "india": "India",           "indian": "India",
+        # África y Oceanía
+        "australiano": "Australia",  "australiana": "Australia", "australian": "Australia",
+        "sudafricano": "Sudáfrica",  "sudafricana": "Sudáfrica",
+        "egipcio": "Egipto",         "egipcia": "Egipto",        "egyptian": "Egipto",
+        "nigeriano": "Nigeria",      "nigeriana": "Nigeria",
+        "marroquí": "Marruecos",                                 "moroccan": "Marruecos",
+    }
+
     for word, country in NATIONALITY_MAP.items():
-        if re.search(rf"\b{word}\b", lower):
+        if re.search(rf"\b{re.escape(word)}\b", lower):
             return country
+
+    # ── 2. Patrones de nacimiento en español ─────────────────────────────────
+    # "nació en Buenos Aires, Argentina" / "nacida en Montevideo"
+    birth_patterns = [
+        r"naci[oó][\w\s,]+en\s+[\wáéíóúñÁÉÍÓÚÑ\s]+,\s*([\wáéíóúñÁÉÍÓÚÑ\s]+?)[\.\(]",
+        r"nacid[oa]\s+en\s+[\wáéíóúñÁÉÍÓÚÑ\s]+,\s*([\wáéíóúñÁÉÍÓÚÑ\s]+?)[\.\(]",
+        # "(Buenos Aires, 1932-" o "(Salto, Uruguay, 1878"
+        r"\([\wáéíóúñÁÉÍÓÚÑ\s]+,\s*([\wáéíóúñÁÉÍÓÚÑ]+)[,\s]\s*\d{4}",
+    ]
+
+    CITY_TO_COUNTRY = {
+        "buenos aires": "Argentina", "córdoba": "Argentina", "rosario": "Argentina",
+        "mendoza": "Argentina", "tucumán": "Argentina", "mar del plata": "Argentina",
+        "montevideo": "Uruguay", "salto": "Uruguay", "paysandú": "Uruguay",
+        "santiago": "Chile", "valparaíso": "Chile",
+        "lima": "Perú", "bogotá": "Colombia", "caracas": "Venezuela",
+        "la paz": "Bolivia", "quito": "Ecuador", "asunción": "Paraguay",
+        "río de janeiro": "Brasil", "são paulo": "Brasil", "brasilia": "Brasil",
+        "ciudad de méxico": "México", "guadalajara": "México", "monterrey": "México",
+        "la habana": "Cuba",
+        "madrid": "España", "barcelona": "España", "sevilla": "España",
+        "paris": "Francia", "lyon": "Francia",
+        "london": "Reino Unido", "londres": "Reino Unido", "edinburgh": "Reino Unido",
+        "berlin": "Alemania", "berlín": "Alemania", "múnich": "Alemania",
+        "roma": "Italia", "milán": "Italia", "nápoles": "Italia",
+        "moscú": "Rusia", "san petersburgo": "Rusia",
+        "tokio": "Japón", "osaka": "Japón",
+        "beijing": "China", "shanghái": "China",
+        "nueva york": "Estados Unidos", "new york": "Estados Unidos",
+        "los ángeles": "Estados Unidos", "chicago": "Estados Unidos",
+        "boston": "Estados Unidos", "washington": "Estados Unidos",
+        "toronto": "Canadá", "montreal": "Canadá",
+        "sídney": "Australia", "melbourne": "Australia",
+        "praga": "República Checa", "varsovia": "Polonia",
+        "estambul": "Turquía", "ankara": "Turquía",
+        "atenas": "Grecia", "tel aviv": "Israel",
+        "dublín": "Irlanda",
+    }
+
+    for pattern in birth_patterns:
+        match = re.search(pattern, lower)
+        if match:
+            place = match.group(1).strip()
+            # Ver si el lugar es un país conocido
+            for nat, country in NATIONALITY_MAP.items():
+                if nat in place:
+                    return country
+            # Ver si es una ciudad conocida
+            for city, country in CITY_TO_COUNTRY.items():
+                if city in place:
+                    return country
+
+    # ── 3. Ciudades en el extracto (más amplio) ───────────────────────────────
+    for city, country in CITY_TO_COUNTRY.items():
+        if city in lower:
+            # Solo si aparece cerca del inicio (primeros 300 chars) para evitar falsos positivos
+            pos = lower.find(city)
+            if pos < 300:
+                return country
+
     return None
 
 
