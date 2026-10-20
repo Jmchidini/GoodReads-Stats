@@ -1,8 +1,8 @@
 """
 sincronizar_locales.py — Script auxiliar para Goodreads Explorer
 
-Toma es.json como fuente de verdad y sincroniza todos los demás archivos
-de idioma en la carpeta locales/, agregando las claves faltantes con un
+Toma es.json como fuente de verdad y sincroniza los idiomas registrados
+en idiomas.py que tienen archivo en locales/, agregando las claves faltantes con un
 placeholder "[TRADUCIR]: valor en español" para que sean fáciles de encontrar.
 
 También detecta claves que existen en otros idiomas pero ya no están en es.json
@@ -15,12 +15,9 @@ Uso:
 import json
 import os
 import sys
+from idiomas import LANGUAGES, SOURCE_LANG
 
-LOCALES_DIR = os.path.join(os.getcwd(), "locales")
-if not os.path.exists(LOCALES_DIR):
-    # Fallback: buscar relativo al script
-    LOCALES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "locales")
-SOURCE_LANG = "es"
+LOCALES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "locales")
 PLACEHOLDER_PREFIX = "[TRADUCIR]"
 
 def load_json(path: str) -> dict:
@@ -32,8 +29,8 @@ def save_json(path: str, data: dict):
         json.dump(data, f, ensure_ascii=False, indent=2)
     print(f"  ✅ Guardado: {os.path.basename(path)}")
 
-def sync():
-    source_path = os.path.join(LOCALES_DIR, f"{SOURCE_LANG}.json")
+def sync(locales_dir=LOCALES_DIR):
+    source_path = os.path.join(locales_dir, f"{SOURCE_LANG}.json")
     if not os.path.exists(source_path):
         print(f"❌ No se encontró el archivo fuente: {source_path}")
         sys.exit(1)
@@ -41,12 +38,11 @@ def sync():
     source = load_json(source_path)
     source_keys = set(source.keys())
 
-    # Buscar todos los demás archivos .json en locales/ (excepto el source y author_countries)
+    # Solo los idiomas registrados; nunca los archivos de datos de autores.
     targets = [
-        f for f in os.listdir(LOCALES_DIR)
-        if f.endswith(".json")
-        and f != f"{SOURCE_LANG}.json"
-        and f != "author_countries.json"
+        f"{code}.json" for code in LANGUAGES.values()
+        if code != SOURCE_LANG
+        and os.path.isfile(os.path.join(locales_dir, f"{code}.json"))
     ]
 
     if not targets:
@@ -54,8 +50,7 @@ def sync():
         return
 
     for filename in sorted(targets):
-        lang = filename.replace(".json", "")
-        path = os.path.join(LOCALES_DIR, filename)
+        path = os.path.join(locales_dir, filename)
         target = load_json(path)
         target_keys = set(target.keys())
 
@@ -87,12 +82,13 @@ def sync():
             print(f"     → Revisalas y borralas a mano si ya no se usan.")
 
         # Guardar manteniendo el orden del source para consistencia
-        ordered = {k: target[k] for k in source_keys if k in target}
+        ordered = {k: target[k] for k in source if k in target}
         # Agregar las obsoletas al final para no perderlas
         for k in sorted(obsolete):
             ordered[k] = target[k]
 
-        save_json(path, ordered)
+        if missing:
+            save_json(path, ordered)
 
     print("\n✅ Sincronización completada.")
     print("   Buscá las claves marcadas con '[TRADUCIR]' en los archivos de idioma y completalas.")

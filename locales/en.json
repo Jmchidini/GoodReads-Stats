@@ -55,7 +55,7 @@
   "authors_top_n": "Show top N",
   "authors_by_books": "By books read",
   "authors_by_pages": "By pages read",
-  "authors_by_rating": "By average rating (≥2 books)",
+  "authors_by_rating": "By average rating (≥2 rated books)",
   "authors_detail_title": "Full author breakdown",
   "authors_selected_title": "📚 Books by",
   "col_rating_avg": "Avg. rating",

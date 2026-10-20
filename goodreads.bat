@@ -1,73 +1,55 @@
 @echo off
+setlocal
+cd /d "%~dp0"
 title Goodreads Explorer
 
-echo ============================================
-echo     Goodreads Explorer - Iniciando app...
-echo ============================================
-echo.
-
-:: Intentar encontrar Python en ubicaciones comunes
-set PYTHON_CMD=
-
-:: 1. Probar "python" directo (si esta en PATH)
-python --version >nul 2>&1
-if not errorlevel 1 (
-    set PYTHON_CMD=python
+set "PYTHON_CMD="
+if exist ".venv\Scripts\python.exe" (
+    set PYTHON_CMD="%~dp0.venv\Scripts\python.exe"
     goto :found
 )
-
-:: 2. Probar "py" (launcher de Windows)
-py --version >nul 2>&1
+py -3.12 -c "import sys; sys.exit(0 if sys.version_info[:2] == (3, 12) else 1)" >nul 2>&1
 if not errorlevel 1 (
-    set PYTHON_CMD=py
+    set "PYTHON_CMD=py -3.12"
     goto :found
 )
-
-:: 3. Buscar en rutas tipicas de instalacion
+python -c "import sys; sys.exit(0 if sys.version_info[:2] == (3, 12) else 1)" >nul 2>&1
+if not errorlevel 1 (
+    set "PYTHON_CMD=python"
+    goto :found
+)
 for %%P in (
-    "%LOCALAPPDATA%\Programs\Python\Python313\python.exe"
     "%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
-    "%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
-    "%LOCALAPPDATA%\Programs\Python\Python310\python.exe"
-    "%LOCALAPPDATA%\Programs\Python\Python39\python.exe"
-    "C:\Python313\python.exe"
     "C:\Python312\python.exe"
-    "C:\Python311\python.exe"
-    "C:\Python310\python.exe"
-    "%APPDATA%\Python\Python313\python.exe"
 ) do (
     if exist %%P (
         set PYTHON_CMD=%%P
         goto :found
     )
 )
-
-:: 4. Buscar con where
-for /f "delims=" %%i in ('where python 2^>nul') do (
-    set PYTHON_CMD=%%i
-    goto :found
-)
-
-echo ERROR: No se pudo encontrar Python.
-echo Descargalo desde https://www.python.org/downloads/
-echo Al instalarlo, tilda la opcion "Add Python to PATH"
+echo ERROR: No se encontro Python 3.12. Instalalo desde https://www.python.org/downloads/
 pause
-exit /b
+exit /b 1
 
 :found
-echo Python encontrado: %PYTHON_CMD%
-echo.
-
-:: Instalar dependencias
+%PYTHON_CMD% -c "import sys; sys.exit(0 if sys.version_info[:2] == (3, 12) else 1)"
+if errorlevel 1 (
+    echo ERROR: Se requiere Python 3.12. Revisa el entorno .venv si existe.
+    pause
+    exit /b 1
+)
 echo Verificando dependencias...
-%PYTHON_CMD% -m pip install streamlit plotly pandas --quiet
-echo.
-
-echo Abriendo la app en el navegador...
-echo Para cerrarla, presiona Ctrl+C en esta ventana.
-echo.
-
-cd /d "%~dp0"
-%PYTHON_CMD% -m streamlit run goodreads_explorer.py
-
+%PYTHON_CMD% -m pip install -r "%~dp0requirements.txt" --quiet
+if errorlevel 1 (
+    echo ERROR: No se pudieron instalar las dependencias. Revisa el mensaje anterior.
+    pause
+    exit /b 1
+)
+echo Abriendo Goodreads Explorer. Para cerrar, presiona Ctrl+C.
+%PYTHON_CMD% -m streamlit run "%~dp0goodreads_explorer.py"
+if errorlevel 1 (
+    echo ERROR: La aplicacion no pudo ejecutarse.
+    pause
+    exit /b 1
+)
 pause

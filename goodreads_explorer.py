@@ -3,7 +3,7 @@ Goodreads Explorer — Streamlit App
 Cargá tu CSV exportado desde Goodreads y explorá tu historial de lectura.
 
 Instalación:
-  pip install streamlit plotly pandas
+  python -m pip install -r requirements.txt
 
 Ejecución:
   streamlit run goodreads_explorer.py
@@ -16,9 +16,10 @@ import plotly.graph_objects as go
 from datetime import datetime
 import json
 import os
+from idiomas import LANGUAGES
+from estadisticas import rated_mean, sort_books
 
 # ── Sistema de traducciones ───────────────────────────────────────────────────
-LANGUAGES = {"Español": "es", "English": "en"}
 
 @st.cache_data
 def load_locale(lang_code: str) -> dict:
@@ -314,16 +315,14 @@ def add_goodreads_links(df_display):
     """Agrega columna de links HTML a un dataframe para mostrar en st.markdown."""
     return df_display
 
-def show_books_table(df_src, sort_col="date_read", height=400):
+def show_books_table(df_src, sort_col="date_read", height=400, ascending=False):
     """Muestra tabla de libros ordenable con link a Goodreads."""
     cols_show = [c for c in ["title","author","pub_year","date_read","my_rating","pages"] if c in df_src.columns]
     tbl = df_src[cols_show].copy()
     tbl["goodreads_url"] = df_src.apply(lambda r: goodreads_url(r), axis=1)
 
     # Formatear fechas y años antes de mostrar
-    date_col = "date_read"
-    if date_col in tbl.columns:
-        tbl = tbl.sort_values(date_col, ascending=False)
+    tbl = sort_books(tbl, sort_col, ascending)
 
     pub_col = "pub_year"
     if pub_col in tbl.columns:
@@ -460,9 +459,8 @@ metric_card(c2, f"{total_pages:,}", t("metric_pages"))
 
 metric_card(c3, dff["author"].nunique(), t("metric_authors"))
 
-rated = dff[dff["my_rating"] > 0]["my_rating"]
-avg_r = rated.mean() if len(rated) else 0
-metric_card(c4, f"{avg_r:.1f} ⭐", t("metric_rating"))
+avg_r = rated_mean(dff["my_rating"])
+metric_card(c4, f"{avg_r:.1f} ⭐" if pd.notna(avg_r) else t("no_rating"), t("metric_rating"))
 
 top_author = dff["author"].value_counts().idxmax() if len(dff) else "—"
 top_count  = dff["author"].value_counts().max() if len(dff) else 0
@@ -779,7 +777,7 @@ with tab2:
         st.markdown(f'<div class="section-title">{t("authors_detail_title")}</div>', unsafe_allow_html=True)
         agg = {"title": "count"}
         if "pages"     in dff.columns: agg["pages"]     = "sum"
-        if "my_rating" in dff.columns: agg["my_rating"] = "mean"
+        if "my_rating" in dff.columns: agg["my_rating"] = rated_mean
         auth_table = (
             dff.groupby("author").agg(agg)
             .rename(columns={"title": bks_label, "pages": pgs_label, "my_rating": t("col_rating_avg")})
@@ -788,7 +786,9 @@ with tab2:
         )
         rat_avg_col = t("col_rating_avg")
         if rat_avg_col in auth_table.columns:
-            auth_table[rat_avg_col] = auth_table[rat_avg_col].round(2)
+            auth_table[rat_avg_col] = auth_table[rat_avg_col].apply(
+                lambda value: f"{value:.2f}" if pd.notna(value) else t("no_rating")
+            )
         if pgs_label in auth_table.columns:
             auth_table[pgs_label] = auth_table[pgs_label].fillna(0).astype(int)
         st.dataframe(auth_table, use_container_width=True, height=320)
@@ -1301,7 +1301,7 @@ with tab4:
     with r1:
         st.markdown(f"**{t('rankings_longest')}**")
         if "pages" in dff.columns:
-            show_books_table(dff.dropna(subset=["pages"]).nlargest(8, "pages"))
+            show_books_table(dff.dropna(subset=["pages"]).nlargest(8, "pages"), sort_col="pages")
 
     with r2:
         st.markdown(f"**{t('rankings_five_stars')}**")
