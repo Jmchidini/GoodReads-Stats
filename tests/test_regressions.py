@@ -7,7 +7,7 @@ import unittest
 
 import pandas as pd
 
-from estadisticas import rated_mean, sort_books
+from estadisticas import rated_mean, sort_books, rating_counts
 from sincronizar_locales import sync
 
 
@@ -41,6 +41,20 @@ class LocaleTests(unittest.TestCase):
 
 
 class StatisticsTests(unittest.TestCase):
+    def test_full_rating_scale_preserves_counts_and_unusual_decimals(self):
+        ratings = pd.Series([0, None, 3.5, 3.5, 4.25, 4.1, 5])
+        counts = rating_counts(ratings, True)
+        self.assertEqual(counts.loc[3.5], 2)
+        self.assertEqual(counts.loc[4.1], 1)
+        self.assertEqual(counts.loc[4.75], 0)
+        self.assertEqual(counts.sum(), 5)
+        self.assertNotIn(0, counts.index)
+        self.assertEqual(len(counts), 21)
+        empty = rating_counts(pd.Series([0, None]), True)
+        self.assertEqual(len(empty), 20)
+        self.assertEqual(empty.sum(), 0)
+        self.assertEqual(rating_counts(ratings).index.tolist(), [3.5, 4.1, 4.25, 5])
+
     def test_unrated_books_do_not_lower_average_or_reduce_totals(self):
         books = pd.DataFrame({"author": ["A"] * 3, "rating": [5, 4, 0], "pages": [100, 200, 300]})
         result = books.groupby("author").agg(rating=("rating", rated_mean), books=("rating", "size"), pages=("pages", "sum"))

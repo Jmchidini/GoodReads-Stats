@@ -37,6 +37,12 @@ Git porque contienen datos personales.
 - Las etiquetas de `Bookshelves` se usan como géneros: un libro puede contar en varios.
 - Cero significa sin puntuación: se excluye de todos los promedios, pero el libro
   sigue contando y sumando páginas. Sin puntuaciones se muestra «Sin puntuación».
+- Las puntuaciones decimales de `My Rating` se conservan en filtros, tablas,
+  fichas y distribución de puntuaciones (por ejemplo, `3.5` o `4.25` en el CSV).
+  El ranking de cinco estrellas incluye solamente puntuaciones exactamente iguales a 5.
+- En la distribución, «Mostrar todas las puntuaciones» completa la escala de 0,25
+  a 5 en pasos de 0,25 con conteos cero, respetando los filtros actuales. Desactivado,
+  muestra únicamente puntuaciones presentes. El 0 (sin puntuación) queda excluido.
 - El ranking de autores por promedio exige dos libros puntuados dentro de los filtros.
 - Los libros sin fecha cuentan en los totales, pero no en los gráficos temporales.
 - Los ocho libros más largos se ordenan por páginas descendentes. Los últimos diez

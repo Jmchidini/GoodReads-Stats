@@ -75,6 +75,8 @@
   "genres_hint": "💡 Click on a bar to see books from that genre, rating or decade.",
   "genres_by_genre": "Books by genre",
   "genres_by_rating": "My rating distribution",
+  "ratings_show_all": "Show all ratings",
+  "ratings_show_all_help": "Show 0.25 to 5 in steps of 0.25, even with no books. Respects current filters and excludes 0 (unrated).",
   "genres_by_decade": "Books by publication decade",
   "genres_selected_genre": "🏷️ Books in genre:",
   "genres_selected_rating_singular": "star",

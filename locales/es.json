@@ -75,6 +75,8 @@
   "genres_hint": "💡 Hacé clic en una barra para ver los libros de ese género, rating o década.",
   "genres_by_genre": "Libros por género",
   "genres_by_rating": "Distribución de mis ratings",
+  "ratings_show_all": "Mostrar todas las puntuaciones",
+  "ratings_show_all_help": "Muestra de 0,25 a 5 en pasos de 0,25, incluso sin libros. Respeta los filtros actuales y excluye el 0 (sin puntuación).",
   "genres_by_decade": "Libros por década de publicación",
   "genres_selected_genre": "🏷️ Libros en el género:",
   "genres_selected_rating_singular": "estrella",

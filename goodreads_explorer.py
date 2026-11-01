@@ -17,7 +17,7 @@ from datetime import datetime
 import json
 import os
 from idiomas import LANGUAGES
-from estadisticas import rated_mean, sort_books
+from estadisticas import rated_mean, sort_books, rating_label, rating_counts
 
 # ── Sistema de traducciones ───────────────────────────────────────────────────
 
@@ -338,7 +338,7 @@ def show_books_table(df_src, sort_col="date_read", height=400, ascending=False):
             "author":       st.column_config.TextColumn(t("col_author")),
             "pub_year":     st.column_config.NumberColumn(t("col_pub_year"), format="%d"),
             "date_read":    st.column_config.DateColumn(t("col_date_read"), format="MMM YYYY"),
-            "my_rating":    st.column_config.NumberColumn(t("col_rating"), format="%d ⭐"),
+            "my_rating":    st.column_config.NumberColumn(t("col_rating"), format="%g ⭐"),
             "pages":        st.column_config.NumberColumn(t("col_pages"), format="%d"),
             "goodreads_url": st.column_config.LinkColumn("🔗", display_text="Goodreads"),
         },
@@ -416,7 +416,7 @@ with st.sidebar:
         t("sidebar_rating"),
         options=ratings_all,
         default=ratings_all,
-        format_func=lambda x: f"{'⭐'*int(x)} ({int(x)})" if x > 0 else t("no_rating"),
+        format_func=lambda x: rating_label(x) if x > 0 else t("no_rating"),
     )
 
     st.markdown("---")
@@ -502,7 +502,7 @@ with tab1:
 
     # Construir hover text
     def hover_text(row):
-        rating_str = "⭐" * int(row.get("my_rating", 0)) if row.get("my_rating", 0) > 0 else t("card_no_rating")
+        rating_str = rating_label(row["my_rating"]) if row.get("my_rating", 0) > 0 else t("card_no_rating")
         pages_str  = f"{int(row['pages'])} {t('col_pages').lower()}" if pd.notna(row.get("pages")) else ""
         genre_str  = ", ".join(row.get("genre_list", []))
         url        = goodreads_url(row)
@@ -616,7 +616,7 @@ with tab1:
 
             if not match.empty:
                 row = match.iloc[0]
-                rating_str = "⭐" * int(row.get("my_rating", 0)) if row.get("my_rating", 0) > 0 else t("card_no_rating")
+                rating_str = rating_label(row["my_rating"]) if row.get("my_rating", 0) > 0 else t("card_no_rating")
                 pages_str  = f"{int(row['pages'])} {t('col_pages').lower()}" if pd.notna(row.get("pages")) else "—"
                 genres_str = ", ".join(row.get("genre_list", [])) or "—"
                 url        = goodreads_url(row)
@@ -672,7 +672,7 @@ with tab1:
                 "author":        st.column_config.TextColumn(t("col_author")),
                 "pub_year":      st.column_config.NumberColumn(t("col_pub_year"), format="%d"),
                 "date_read":     st.column_config.DateColumn(t("col_date_read"), format="MMM YYYY"),
-                "my_rating":     st.column_config.NumberColumn(t("col_rating"), format="%d ⭐"),
+                "my_rating":     st.column_config.NumberColumn(t("col_rating"), format="%g ⭐"),
                 "pages":         st.column_config.NumberColumn(t("col_pages"), format="%d"),
                 "primary_genre": st.column_config.TextColumn(t("col_genre")),
                 "goodreads_url": st.column_config.LinkColumn("🔗", display_text="Goodreads"),
@@ -1234,12 +1234,19 @@ with tab4:
 
     with col_f:
         st.markdown(f'<div class="section-title">{t("genres_by_rating")}</div>', unsafe_allow_html=True)
-        rat_df = dff[dff["my_rating"] > 0]["my_rating"].value_counts().sort_index().reset_index()
+        show_all_ratings = st.checkbox(
+            t("ratings_show_all"), key="show_all_ratings", help=t("ratings_show_all_help")
+        )
+        rat_df = rating_counts(dff["my_rating"], show_all_ratings).reset_index()
         rat_df.columns = [rat_label, qty_label]
-        rat_df[stars_label] = rat_df[rat_label].apply(lambda x: "⭐"*int(x))
+        rat_df[stars_label] = rat_df[rat_label].apply(rating_label)
         fig_rat = px.bar(rat_df, x=stars_label, y=qty_label,
                          color=qty_label, color_continuous_scale=[ORANGE, RED])
         fig_rat.update_layout(**LAYOUT_BASE, height=300, coloraxis_showscale=False)
+        if show_all_ratings:
+            fig_rat.update_xaxes(
+                tickmode="array", tickvals=rat_df[stars_label].tolist(), tickangle=-60
+            )
         sel_rat = st.plotly_chart(fig_rat, use_container_width=True,
                                   on_select="rerun", key="chart_ratings")
 
@@ -1271,7 +1278,7 @@ with tab4:
             if pts:
                 idx = pts[0].get("point_index", None)
                 if idx is not None:
-                    rat_val = int(rat_df.iloc[idx][rat_label])
+                    rat_val = rat_df.iloc[idx][rat_label]
                     star_word = t("genres_selected_rating_singular") if rat_val == 1 else t("genres_selected_rating_plural")
                     selected_label = f"⭐ {rat_val} {star_word}"
                     filtered_books = dff[dff["my_rating"] == rat_val]
